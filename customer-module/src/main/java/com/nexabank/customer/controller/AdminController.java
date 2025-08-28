@@ -5,7 +5,7 @@ import com.nexabank.customer.dto.ApiResponse;
 import com.nexabank.customer.dto.UserDto;
 import com.nexabank.customer.dto.CreateUserRequest;
 import com.nexabank.customer.dto.BankAccountDto;
-import com.nexabank.customer.service.AdminService;
+import com.nexabank.customer.service.EnhancedAdminService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,7 +21,7 @@ import java.util.List;
 public class AdminController {
 
     @Autowired
-    private AdminService adminService;
+    private EnhancedAdminService adminService;
 
     @GetMapping("/stats")
     public ResponseEntity<ApiResponse<AdminStatsResponse>> getAdminStats() {

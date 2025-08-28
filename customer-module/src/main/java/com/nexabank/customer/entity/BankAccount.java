@@ -33,6 +33,9 @@ public class BankAccount {
     @Column(name = "user_id", nullable = false)
     private String userId;
     
+    @Column(name = "customer_number")
+    private String customerNumber;
+    
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
     private AccountStatus status = AccountStatus.ACTIVE;
