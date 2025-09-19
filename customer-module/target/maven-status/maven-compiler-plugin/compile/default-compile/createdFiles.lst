@@ -1,9 +1,11 @@
 com\nexabank\customer\entity\BankAccount.class
 com\nexabank\customer\entity\CustomerClassification.class
 com\nexabank\customer\entity\CustomerDetails$CustomerStatus.class
+com\nexabank\customer\service\CustomerProofOfIdentityService.class
 com\nexabank\customer\service\AdminService$1.class
 com\nexabank\customer\dto\BankAccountDto.class
 com\nexabank\customer\service\EnhancedAdminService$3.class
+com\nexabank\customer\util\JwtUtils.class
 com\nexabank\customer\entity\CustomerProofOfIdentity.class
 com\nexabank\customer\service\EnhancedAdminService$6.class
 com\nexabank\customer\service\AdminService$5.class
@@ -11,6 +13,7 @@ com\nexabank\customer\service\AdminService.class
 com\nexabank\customer\service\EnhancedAdminService.class
 com\nexabank\customer\CustomerServiceApplication.class
 com\nexabank\customer\entity\CustomerIdentification.class
+com\nexabank\customer\controller\AuthController.class
 com\nexabank\customer\dto\CustomerProofOfIdentityDto.class
 com\nexabank\customer\dto\CustomerDetailsDto.class
 com\nexabank\customer\dto\CustomerNameComponentDto.class
@@ -18,8 +21,10 @@ com\nexabank\customer\service\CustomerUserIntegrationService.class
 com\nexabank\customer\service\AdminService$7.class
 com\nexabank\customer\service\EnhancedAdminService$2.class
 com\nexabank\customer\dto\CustomerClassificationDto.class
+com\nexabank\customer\service\CustomerAuthService.class
 com\nexabank\customer\repository\CustomerDetailsRepository.class
 com\nexabank\customer\entity\User.class
+com\nexabank\customer\repository\UserSessionRepository.class
 com\nexabank\customer\service\AdminService$4.class
 com\nexabank\customer\entity\Transaction.class
 com\nexabank\customer\service\EnhancedAdminService$5.class
@@ -51,8 +56,10 @@ com\nexabank\customer\service\EnhancedAdminService$ApiResponse.class
 com\nexabank\customer\config\RestTemplateConfig.class
 com\nexabank\customer\mapper\CustomerMapper.class
 com\nexabank\customer\dto\AdminStatsResponse.class
+com\nexabank\customer\entity\UserSession.class
 com\nexabank\customer\service\AdminService$3.class
 com\nexabank\customer\service\CustomerDetailsService.class
 com\nexabank\customer\dto\CreateUserRequest.class
 com\nexabank\customer\service\AdminService$6.class
+com\nexabank\customer\security\JwtAuthenticationFilter.class
 com\nexabank\customer\repository\TransactionRepository.class

@@ -7,7 +7,7 @@ interface AccountSummaryProps {
   userType: string;
 }
 
-const AccountSummary: React.FC<AccountSummaryProps> = ({ userType }) => {
+const AccountSummary: React.FC<AccountSummaryProps> = ({ userType: _ }) => {
   const [showBalance, setShowBalance] = React.useState(true);
 
   const accounts = [

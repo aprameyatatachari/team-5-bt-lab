@@ -5,7 +5,6 @@ import com.nexabank.customer.dto.CreateUserRequest;
 import com.nexabank.customer.dto.UserDto;
 import com.nexabank.customer.dto.BankAccountDto;
 import com.nexabank.customer.entity.BankAccount;
-import com.nexabank.customer.entity.Transaction;
 import com.nexabank.customer.entity.User;
 import com.nexabank.customer.repository.BankAccountRepository;
 import com.nexabank.customer.repository.TransactionRepository;
@@ -16,7 +15,6 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

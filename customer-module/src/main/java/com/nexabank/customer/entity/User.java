@@ -2,6 +2,7 @@ package com.nexabank.customer.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "users")
@@ -13,6 +14,9 @@ public class User {
     
     @Column(name = "email", unique = true, nullable = false)
     private String email;
+    
+    @Column(name = "password_hash", nullable = false)
+    private String passwordHash;
     
     @Column(name = "first_name", nullable = false)
     private String firstName;
@@ -35,22 +39,35 @@ public class User {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
-    // Default constructor
-    public User() {}
+    @Column(name = "last_login")
+    private LocalDateTime lastLogin;
     
-    // Constructor
-    public User(String userId, String email, String firstName, String lastName, 
-                String phoneNumber, String userType, String status) {
-        this.userId = userId;
-        this.email = email;
-        this.firstName = firstName;
-        this.lastName = lastName;
-        this.phoneNumber = phoneNumber;
-        this.userType = userType;
-        this.status = status;
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-    }
+    @Column(name = "failed_login_attempts")
+    private Integer failedLoginAttempts = 0;
+    
+    @Column(name = "date_of_birth")
+    private LocalDate dateOfBirth;
+    
+    @Column(name = "address")
+    private String address;
+    
+    @Column(name = "city")
+    private String city;
+    
+    @Column(name = "state")
+    private String state;
+    
+    @Column(name = "country")
+    private String country = "India";
+    
+    @Column(name = "postal_code")
+    private String postalCode;
+    
+    @Column(name = "aadhar_number")
+    private String aadharNumber;
+    
+    @Column(name = "pan_number")
+    private String panNumber;
     
     // Getters and Setters
     public String getUserId() {
@@ -67,6 +84,14 @@ public class User {
     
     public void setEmail(String email) {
         this.email = email;
+    }
+    
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+    
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
     
     public String getFirstName() {
@@ -123,6 +148,86 @@ public class User {
     
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+    
+    public LocalDateTime getLastLogin() {
+        return lastLogin;
+    }
+    
+    public void setLastLogin(LocalDateTime lastLogin) {
+        this.lastLogin = lastLogin;
+    }
+    
+    public Integer getFailedLoginAttempts() {
+        return failedLoginAttempts;
+    }
+    
+    public void setFailedLoginAttempts(Integer failedLoginAttempts) {
+        this.failedLoginAttempts = failedLoginAttempts;
+    }
+    
+    public LocalDate getDateOfBirth() {
+        return dateOfBirth;
+    }
+    
+    public void setDateOfBirth(LocalDate dateOfBirth) {
+        this.dateOfBirth = dateOfBirth;
+    }
+    
+    public String getAddress() {
+        return address;
+    }
+    
+    public void setAddress(String address) {
+        this.address = address;
+    }
+    
+    public String getCity() {
+        return city;
+    }
+    
+    public void setCity(String city) {
+        this.city = city;
+    }
+    
+    public String getState() {
+        return state;
+    }
+    
+    public void setState(String state) {
+        this.state = state;
+    }
+    
+    public String getCountry() {
+        return country;
+    }
+    
+    public void setCountry(String country) {
+        this.country = country;
+    }
+    
+    public String getPostalCode() {
+        return postalCode;
+    }
+    
+    public void setPostalCode(String postalCode) {
+        this.postalCode = postalCode;
+    }
+    
+    public String getAadharNumber() {
+        return aadharNumber;
+    }
+    
+    public void setAadharNumber(String aadharNumber) {
+        this.aadharNumber = aadharNumber;
+    }
+    
+    public String getPanNumber() {
+        return panNumber;
+    }
+    
+    public void setPanNumber(String panNumber) {
+        this.panNumber = panNumber;
     }
     
     @PrePersist

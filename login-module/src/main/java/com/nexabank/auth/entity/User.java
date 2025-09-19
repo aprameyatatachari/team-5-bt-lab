@@ -48,7 +48,7 @@ public class User {
     private LocalDateTime updatedAt = LocalDateTime.now();
     
     @Column(name = "last_login")
-    private LocalDateTime lastLogin;
+    private LocalDateTime lastLogin; 
     
     @Column(name = "failed_login_attempts")
     private Integer failedLoginAttempts = 0;

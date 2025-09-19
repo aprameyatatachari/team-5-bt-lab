@@ -1,7 +1,7 @@
 package com.nexabank.auth.security;
 
 import com.nexabank.auth.service.UserDetailsServiceImpl;
-import com.nexabank.auth.util.JwtUtil;
+import com.nexabank.auth.util.JwtUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,7 +21,7 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     
     @Autowired
-    private JwtUtil jwtUtil;
+    private JwtUtils jwtUtils;
     
     @Autowired
     private UserDetailsServiceImpl userDetailsService;
@@ -33,18 +33,43 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                   FilterChain filterChain) throws ServletException, IOException {
         try {
             String jwt = parseJwt(request);
-            if (jwt != null && jwtUtil.validateJwtToken(jwt)) {
-                String username = jwtUtil.getUsernameFromJwtToken(jwt);
+            if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
+                String username = jwtUtils.getUserNameFromJwtToken(jwt);
                 
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                UsernamePasswordAuthenticationToken authentication = 
-                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                if (username != null) {
+                    // Load user details and verify user is still active
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                    
+                    // Create authentication token
+                    UsernamePasswordAuthenticationToken authentication = 
+                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    
+                    // Set authentication in security context
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    
+                    logger.debug("User '{}' authenticated successfully", username);
+                } else {
+                    logger.error("Username could not be extracted from valid JWT token");
+                }
+            } else if (jwt != null) {
+                logger.warn("Invalid JWT token provided");
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("{\"error\":\"Invalid or expired token\"}");
+                response.setContentType("application/json");
+                return;
             }
         } catch (Exception e) {
             logger.error("Cannot set user authentication: {}", e.getMessage());
+            SecurityContextHolder.clearContext();
+            
+            // For authentication errors, return 401
+            if (e.getMessage().contains("expired") || e.getMessage().contains("invalid")) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("{\"error\":\"Authentication failed: " + e.getMessage() + "\"}");
+                response.setContentType("application/json");
+                return;
+            }
         }
         
         filterChain.doFilter(request, response);

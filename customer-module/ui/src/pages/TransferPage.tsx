@@ -70,7 +70,7 @@ const TransferPage: React.FC = () => {
     }).format(amount);
   };
 
-  const onSubmit = async (data: TransferForm) => {
+  const onSubmit = async (_data: TransferForm) => {
     setIsProcessing(true);
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 2000));

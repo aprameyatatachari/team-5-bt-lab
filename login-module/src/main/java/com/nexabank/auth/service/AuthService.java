@@ -47,17 +47,35 @@ public class AuthService {
     @Autowired
     private JwtUtils jwtUtils;
     
+    @Autowired
+    private CustomerIntegrationService customerIntegrationService;
+    
     @Value("${app.jwt.expiration}")
     private int jwtExpirationMs;
     
     @Transactional
     public AuthResponse registerUser(RegisterRequest registerRequest) {
-        // Check if email already exists
+        logger.info("Attempting to register user: {}", registerRequest.getEmail());
+        
+        // Check if email already exists in local auth service
         if (userRepository.existsByEmail(registerRequest.getEmail())) {
             throw new BadRequestException("Email is already taken!");
         }
         
-        // Create new user
+        try {
+            // Try to register user through customer service first
+            if (customerIntegrationService.isCustomerServiceAvailable()) {
+                logger.info("Registering user through customer service: {}", registerRequest.getEmail());
+                customerIntegrationService.registerUserInCustomerService(registerRequest);
+            } else {
+                logger.warn("Customer service unavailable, registering in auth service only: {}", registerRequest.getEmail());
+            }
+        } catch (Exception e) {
+            logger.error("Failed to register user in customer service, proceeding with auth service only: {}", e.getMessage());
+            // Continue with local registration if customer service fails
+        }
+        
+        // Always create user in local auth service for authentication purposes
         User user = new User();
         user.setEmail(registerRequest.getEmail());
         user.setPasswordHash(passwordEncoder.encode(registerRequest.getPassword()));

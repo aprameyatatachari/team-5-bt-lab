@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Button } from '../ui/Button';
 import { 
   User, 
@@ -17,16 +17,18 @@ import { Badge } from '../ui/Badge';
 
 const BankingHeader: React.FC = () => {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const [showMobileMenu, setShowMobileMenu] = React.useState(false);
 
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/login');
+      // Redirect to login module (external redirect)
+      window.location.href = 'http://localhost:5173';
     } catch (error) {
       console.error('Logout failed:', error);
+      // Even if logout API fails, redirect to login
+      window.location.href = 'http://localhost:5173';
     }
   };
 

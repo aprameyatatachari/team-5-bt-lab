@@ -1,5 +1,7 @@
+C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\login_module\dto\CreateUserRequest.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\AuthServiceApplication.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\config\DataLoader.java
+C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\config\HttpClientConfig.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\config\SecurityConfig.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\controller\AdminController.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\controller\AuthController.java
@@ -10,6 +12,7 @@ C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexaba
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\dto\RefreshTokenRequest.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\dto\RegisterRequest.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\dto\UserDto.java
+C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\entity\JwtBlacklist.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\entity\User.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\entity\UserSession.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\exception\BadRequestException.java
@@ -20,6 +23,7 @@ C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexaba
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\security\JwtAuthenticationFilter.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\service\AdminService.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\service\AuthService.java
+C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\service\CustomerIntegrationService.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\service\UserDetailsServiceImpl.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\util\JwtUtil.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\util\JwtUtils.java

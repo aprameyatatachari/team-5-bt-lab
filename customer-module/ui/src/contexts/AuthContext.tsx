@@ -120,25 +120,56 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
-      await authAPI.logout();
+      // Get the token before making the API call
+      const token = localStorage.getItem('accessToken');
+      
+      if (token) {
+        try {
+          await authAPI.logout();
+          console.log('Logout API call successful');
+        } catch (error) {
+          console.error('Logout API call failed:', error);
+          // Continue with local logout even if API fails
+        }
+      }
     } catch (error) {
-      console.error('Logout API call failed:', error);
+      console.error('Logout process failed:', error);
     } finally {
+      // Always clear local storage and state
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
       setUser(null);
+      
+      // Force a page refresh to ensure clean state
+      console.log('User logged out, clearing authentication state');
     }
   };
 
   const logoutAllDevices = async () => {
     try {
-      await authAPI.logoutAllDevices();
+      const token = localStorage.getItem('accessToken');
+      
+      if (token) {
+        try {
+          await authAPI.logoutAllDevices();
+          console.log('Logout all devices API call successful');
+        } catch (error) {
+          console.error('Logout all devices API call failed:', error);
+          // Continue with local logout even if API fails
+        }
+      }
     } catch (error) {
-      console.error('Logout all devices failed:', error);
+      console.error('Logout all devices process failed:', error);
     } finally {
+      // Always clear local storage and state
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
       setUser(null);
+      
+      // Force a page refresh to ensure clean state
+      console.log('User logged out from all devices, clearing authentication state');
     }
   };
 
