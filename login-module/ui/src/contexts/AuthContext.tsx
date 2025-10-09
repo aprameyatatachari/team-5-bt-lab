@@ -5,12 +5,16 @@ import type { User, LoginRequest, RegisterRequest } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
+  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (credentials: LoginRequest) => Promise<void>;
   register: (userData: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   logoutAllDevices: () => Promise<void>;
+  hasRole: (role: string) => boolean;
+  isAdmin: () => boolean;
+  isCustomer: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,6 +33,7 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(localStorage.getItem('accessToken'));
   const [isLoading, setIsLoading] = useState(true);
 
   // Check if user is authenticated on mount
@@ -41,12 +46,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           setUser(null);
+          setToken(null);
           const cleanUrl = window.location.origin + window.location.pathname;
           window.history.replaceState({}, '', cleanUrl);
         }
 
-        const token = localStorage.getItem('accessToken');
-        if (token) {
+        const accessToken = localStorage.getItem('accessToken');
+        if (accessToken) {
+          setToken(accessToken);
+          
+          // Try to decode JWT token to get role information
+          try {
+            const payload = JSON.parse(atob(accessToken.split('.')[1]));
+            if (payload.roles) {
+              // If we have role info in token, create enhanced user object
+              const enhancedUser = {
+                ...user,
+                roles: payload.roles || []
+              };
+              setUser(enhancedUser as User);
+            }
+          } catch (jwtError) {
+            console.warn('Could not decode JWT token for roles:', jwtError);
+          }
+          
           const response = await authAPI.getCurrentUser();
           if (response.success) {
             setUser(response.data);
@@ -54,12 +77,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // Token is invalid, clear it
             localStorage.removeItem('accessToken');
             localStorage.removeItem('refreshToken');
+            setToken(null);
           }
         }
       } catch (error) {
         console.error('Auth check failed:', error);
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
+        setToken(null);
       } finally {
         setIsLoading(false);
       }
@@ -75,6 +100,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const { accessToken, refreshToken, user } = response.data;
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('refreshToken', refreshToken);
+        setToken(accessToken);
         setUser(user);
       } else {
         throw new Error(response.message);
@@ -92,6 +118,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const { accessToken, refreshToken, user } = response.data;
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('refreshToken', refreshToken);
+        setToken(accessToken);
         setUser(user);
       } else {
         throw new Error(response.message);
@@ -110,6 +137,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      setToken(null);
       setUser(null);
     }
   };
@@ -122,18 +150,47 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      setToken(null);
       setUser(null);
     }
   };
 
+  const hasRole = (role: string): boolean => {
+    if (!user) return false;
+    // Check if user has roles property (enhanced version)
+    if ('roles' in user && Array.isArray(user.roles)) {
+      return user.roles.includes(role);
+    }
+    // Fallback: check basic role based on userType
+    if (role === 'ADMIN_FULL_ACCESS' && user.userType === 'ADMIN') return true;
+    if (role === 'CUSTOMER_VIEW' && user.userType === 'CUSTOMER') return true;
+    return false;
+  };
+
+  const isAdmin = (): boolean => {
+    return hasRole('ADMIN_FULL_ACCESS') || 
+           hasRole('ADMIN_USER_MANAGEMENT') || 
+           hasRole('ADMIN_SYSTEM_CONFIG') ||
+           hasRole('ADMIN_REPORTS') ||
+           user?.userType === 'ADMIN';
+  };
+
+  const isCustomer = (): boolean => {
+    return user?.userType === 'CUSTOMER' || hasRole('CUSTOMER_VIEW');
+  };
+
   const value: AuthContextType = {
     user,
+    token,
     isAuthenticated: !!user,
     isLoading,
     login,
     register,
     logout,
     logoutAllDevices,
+    hasRole,
+    isAdmin,
+    isCustomer,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
