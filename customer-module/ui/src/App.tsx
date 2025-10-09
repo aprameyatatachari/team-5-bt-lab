@@ -21,14 +21,41 @@ const App: React.FC = () => {
     );
   }
 
-  // If not authenticated, redirect to login service
-  if (!isAuthenticated) {
+  // Check for logout flags to prevent redirect loops
+  const urlParams = new URLSearchParams(window.location.search);
+  const loggedOut = urlParams.get('loggedOut') === '1';
+  const sessionExpired = urlParams.get('session') === 'expired';
+
+  // If not authenticated, redirect to login service (unless already redirecting)
+  if (!isAuthenticated && !loggedOut && !sessionExpired) {
     window.location.href = 'http://localhost:5173'; // Login module port
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Redirecting to login...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If not authenticated but have logout flags, show logout message
+  if (!isAuthenticated && (loggedOut || sessionExpired)) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+            {loggedOut ? 'Logged Out' : 'Session Expired'}
+          </h1>
+          <p className="text-gray-600 mb-6">
+            {loggedOut ? 'You have been successfully logged out.' : 'Your session has expired. Please log in again.'}
+          </p>
+          <button
+            onClick={() => window.location.href = 'http://localhost:5173'}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Go to Login
+          </button>
         </div>
       </div>
     );

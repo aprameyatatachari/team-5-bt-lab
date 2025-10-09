@@ -1,87 +1,73 @@
 package com.nexabank.auth.security;
 
+import com.nexabank.auth.service.JwtTokenService;
 import com.nexabank.auth.service.UserDetailsServiceImpl;
-import com.nexabank.auth.util.JwtUtils;
+import com.nexabank.auth.service.RedisSessionService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-import org.springframework.util.StringUtils;
+import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+@Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-    
+
     @Autowired
-    private JwtUtils jwtUtils;
-    
+    private JwtTokenService jwtTokenService;
+
     @Autowired
     private UserDetailsServiceImpl userDetailsService;
-    
-    private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
-    
+
+    @Autowired
+    private RedisSessionService redisSessionService;
+
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, 
-                                  FilterChain filterChain) throws ServletException, IOException {
-        try {
-            String jwt = parseJwt(request);
-            if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
-                String username = jwtUtils.getUserNameFromJwtToken(jwt);
-                
-                if (username != null) {
-                    // Load user details and verify user is still active
-                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+
+        final String authorizationHeader = request.getHeader("Authorization");
+
+        String username = null;
+        String jwt = null;
+
+        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+            jwt = authorizationHeader.substring(7);
+            try {
+                if (jwtTokenService.validateToken(jwt)) {
+                    username = jwtTokenService.extractEmail(jwt);
                     
-                    // Create authentication token
-                    UsernamePasswordAuthenticationToken authentication = 
-                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    
-                    // Set authentication in security context
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                    
-                    logger.debug("User '{}' authenticated successfully", username);
-                } else {
-                    logger.error("Username could not be extracted from valid JWT token");
+                    // Check if user is locked out
+                    if (username != null && redisSessionService.isUserLockedOut(username)) {
+                        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                        response.getWriter().write("{\"error\":\"Account locked. Please login again.\"}");
+                        response.setContentType("application/json");
+                        return;
+                    }
                 }
-            } else if (jwt != null) {
-                logger.warn("Invalid JWT token provided");
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.getWriter().write("{\"error\":\"Invalid or expired token\"}");
-                response.setContentType("application/json");
-                return;
-            }
-        } catch (Exception e) {
-            logger.error("Cannot set user authentication: {}", e.getMessage());
-            SecurityContextHolder.clearContext();
-            
-            // For authentication errors, return 401
-            if (e.getMessage().contains("expired") || e.getMessage().contains("invalid")) {
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.getWriter().write("{\"error\":\"Authentication failed: " + e.getMessage() + "\"}");
-                response.setContentType("application/json");
-                return;
+            } catch (Exception e) {
+                logger.error("JWT token validation failed: " + e.getMessage());
             }
         }
-        
+
+        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
+
+            if (jwtTokenService.validateToken(jwt)) {
+                UsernamePasswordAuthenticationToken authToken = 
+                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+            }
+        }
+
         filterChain.doFilter(request, response);
-    }
-    
-    private String parseJwt(HttpServletRequest request) {
-        String headerAuth = request.getHeader("Authorization");
-        
-        if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
-            return headerAuth.substring(7);
-        }
-        
-        return null;
     }
 }

@@ -35,6 +35,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // Honor logout/session flags from customer app and force-clear
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('loggedOut') === '1' || params.get('session') === 'expired') {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          setUser(null);
+          const cleanUrl = window.location.origin + window.location.pathname;
+          window.history.replaceState({}, '', cleanUrl);
+        }
+
         const token = localStorage.getItem('accessToken');
         if (token) {
           const response = await authAPI.getCurrentUser();

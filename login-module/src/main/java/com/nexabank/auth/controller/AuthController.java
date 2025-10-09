@@ -1,209 +1,194 @@
 package com.nexabank.auth.controller;
 
-import com.nexabank.auth.dto.ApiResponse;
-import com.nexabank.auth.dto.AuthResponse;
-import com.nexabank.auth.dto.LoginRequest;
-import com.nexabank.auth.dto.RegisterRequest;
-import com.nexabank.auth.dto.RefreshTokenRequest;
+import com.nexabank.auth.dto.*;
 import com.nexabank.auth.entity.User;
-import com.nexabank.auth.repository.UserRepository;
-import com.nexabank.auth.service.AuthService;
-import com.nexabank.auth.util.JwtUtils;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.MalformedJwtException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.nexabank.auth.exception.AuthenticationException;
+import com.nexabank.auth.exception.UserAlreadyExistsException;
+import com.nexabank.auth.service.UserService;
+import com.nexabank.auth.service.JwtTokenService;
+import com.nexabank.auth.service.RedisSessionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*", maxAge = 3600)
+@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class AuthController {
-    
-    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
-    
+
     @Autowired
-    private AuthService authService;
-    
+    private UserService userService;
+
     @Autowired
-    private JwtUtils jwtUtils;
-    
+    private JwtTokenService jwtTokenService;
+
     @Autowired
-    private UserRepository userRepository;
-    
-    @PostMapping("/register")
-    public ResponseEntity<ApiResponse<AuthResponse>> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
-        try {
-            AuthResponse authResponse = authService.registerUser(registerRequest);
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(ApiResponse.success("User registered successfully!", authResponse));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ApiResponse.error(e.getMessage()));
-        }
-    }
-    
+    private RedisSessionService redisSessionService;
+
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<AuthResponse>> authenticateUser(@Valid @RequestBody LoginRequest loginRequest,
-                                                                     HttpServletRequest request) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest, HttpServletRequest request) {
         try {
-            AuthResponse authResponse = authService.authenticateUser(loginRequest, request);
-            return ResponseEntity.ok(ApiResponse.success("Login successful!", authResponse));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error(e.getMessage()));
-        }
-    }
-    
-    @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(@RequestBody RefreshTokenRequest request) {
-        try {
-            AuthResponse authResponse = authService.refreshToken(request.getRefreshToken());
-            return ResponseEntity.ok(ApiResponse.success("Token refreshed successfully!", authResponse));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error(e.getMessage()));
-        }
-    }
-    
-    @PostMapping("/logout")
-    @PreAuthorize("hasRole('CUSTOMER') or hasRole('ADMIN') or hasRole('EMPLOYEE')")
-    public ResponseEntity<ApiResponse<String>> logoutUser(HttpServletRequest request) {
-        try {
-            String authHeader = request.getHeader("Authorization");
-            if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                String accessToken = authHeader.substring(7);
+            // Check if user is locked out
+            if (redisSessionService.isUserLockedOut(loginRequest.getEmail())) {
+                long remainingTime = redisSessionService.getRemainingLockoutTime(loginRequest.getEmail());
+                return ResponseEntity.status(HttpStatus.LOCKED)
+                    .body(ApiResponse.error("Account locked. Please try again in " + remainingTime + " seconds"));
+            }
+
+            // Authenticate user with BCrypt password validation
+            User authResult = userService.authenticate(loginRequest.getEmail(), loginRequest.getPassword());
+            
+            if (authResult != null) {
+                // Create JWT tokens with role information
+                String accessToken = jwtTokenService.generateAccessTokenForUser(authResult);
+                String refreshToken = jwtTokenService.generateRefreshTokenForUser(authResult);
                 
-                // Validate token before logout
-                if (!jwtUtils.validateJwtToken(accessToken)) {
-                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                            .body(ApiResponse.error("Invalid token"));
+                AuthResponse authResponse = new AuthResponse();
+                authResponse.setAccessToken(accessToken);
+                authResponse.setRefreshToken(refreshToken);
+                authResponse.setTokenType("Bearer");
+                authResponse.setExpiresIn(86400L); // 24 hours in seconds
+                authResponse.setUser(authResult);
+                
+                return ResponseEntity.ok(ApiResponse.success("Login successful", authResponse));
+            } else {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Invalid email or password"));
+            }
+        } catch (AuthenticationException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error("Invalid email or password"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Authentication failed: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody RegisterRequest registerRequest) {
+        try {
+            User user = userService.registerUser(
+                registerRequest.getEmail(),
+                registerRequest.getPassword(),
+                registerRequest.getFirstName(),
+                registerRequest.getLastName(),
+                registerRequest.getPhoneNumber(),
+                "CUSTOMER" // Default user type
+            );
+            
+            // Create JWT tokens for immediate login after registration
+            String accessToken = jwtTokenService.generateAccessTokenForUser(user);
+            String refreshToken = jwtTokenService.generateRefreshTokenForUser(user);
+            
+            AuthResponse authResponse = new AuthResponse();
+            authResponse.setAccessToken(accessToken);
+            authResponse.setRefreshToken(refreshToken);
+            authResponse.setTokenType("Bearer");
+            authResponse.setExpiresIn(86400L); // 24 hours in seconds
+            authResponse.setUser(user);
+            
+            return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("User registered successfully", authResponse));
+        } catch (UserAlreadyExistsException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error("User with this email already exists"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Registration failed: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@RequestHeader("Authorization") String authHeader) {
+        try {
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                String token = authHeader.substring(7);
+                
+                // Get user email from token and clear lockout on explicit logout
+                String userEmail = jwtTokenService.getUsernameFromToken(token);
+                redisSessionService.clearUserLockout(userEmail);
+                
+                // Blacklist the token using Redis session service
+                jwtTokenService.blacklistToken(token);
+                
+                // Optional: Call legacy logout method if needed
+                // userService.logoutUser(token);
+            }
+            
+            return ResponseEntity.ok(ApiResponse.success("Logged out successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Logout failed: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(@RequestBody RefreshTokenRequest refreshRequest) {
+        try {
+            if (jwtTokenService.validateToken(refreshRequest.getRefreshToken())) {
+                String email = jwtTokenService.extractEmail(refreshRequest.getRefreshToken());
+                
+                // Check if user is locked out
+                if (redisSessionService.isUserLockedOut(email)) {
+                    long remainingTime = redisSessionService.getRemainingLockoutTime(email);
+                    return ResponseEntity.status(HttpStatus.LOCKED)
+                        .body(ApiResponse.error("Account locked. Please try again in " + remainingTime + " seconds"));
                 }
                 
-                // Perform logout
-                authService.logout(accessToken);
+                var userOptional = userService.findByEmail(email);
                 
-                // Also invalidate the token in JWT utils
-                jwtUtils.invalidateToken(accessToken);
-                
-                logger.info("User logged out successfully with token ending in: {}", 
-                           accessToken.substring(Math.max(0, accessToken.length() - 10)));
+                if (userOptional.isPresent()) {
+                    User user = userOptional.get();
+                    String newAccessToken = jwtTokenService.generateAccessTokenForUser(user);
+                    String newRefreshToken = jwtTokenService.generateRefreshTokenForUser(user);
+                    
+                    // Blacklist old refresh token and extend lockout
+                    jwtTokenService.blacklistToken(refreshRequest.getRefreshToken());
+                    redisSessionService.setUserLockout(user.getEmail()); // Reset 10-minute lockout
+                    
+                    // Update session using the refresh session method
+                    // userService.refreshUserSession(refreshRequest.getRefreshToken());
+                    
+                    AuthResponse authResponse = new AuthResponse();
+                    authResponse.setAccessToken(newAccessToken);
+                    authResponse.setRefreshToken(newRefreshToken);
+                    authResponse.setTokenType("Bearer");
+                    authResponse.setExpiresIn(86400L); // 24 hours in seconds
+                    authResponse.setUser(user);
+                    
+                    return ResponseEntity.ok(ApiResponse.success("Token refreshed successfully", authResponse));
+                }
+            }
+            
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error("Invalid refresh token"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Token refresh failed: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/lockout-status/{email}")
+    public ResponseEntity<?> getLockoutStatus(@PathVariable String email) {
+        try {
+            boolean isLockedOut = redisSessionService.isUserLockedOut(email);
+            long remainingTime = redisSessionService.getRemainingLockoutTime(email);
+            
+            if (isLockedOut) {
+                Map<String, Object> lockoutData = new HashMap<>();
+                lockoutData.put("remainingTime", remainingTime);
+                return ResponseEntity.ok(ApiResponse.success("User is locked out", lockoutData));
             } else {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(ApiResponse.error("No authorization token provided"));
+                return ResponseEntity.ok(ApiResponse.success("User is not locked out"));
             }
-            return ResponseEntity.ok(ApiResponse.success("User logged out successfully!"));
-        } catch (Exception e) {
-            logger.error("Logout error: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Logout failed: " + e.getMessage()));
-        }
-    }
-    
-    @PostMapping("/logout-all")
-    @PreAuthorize("hasRole('CUSTOMER') or hasRole('ADMIN') or hasRole('EMPLOYEE')")
-    public ResponseEntity<ApiResponse<String>> logoutAllDevices(Authentication authentication) {
-        try {
-            String userId = ((com.nexabank.auth.service.UserDetailsServiceImpl.UserPrincipal) authentication.getPrincipal()).getId();
-            authService.logoutAllDevices(userId);
-            return ResponseEntity.ok(ApiResponse.success("Logged out from all devices successfully!"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error(e.getMessage()));
-        }
-    }
-    
-    @GetMapping("/me")
-    @PreAuthorize("hasRole('CUSTOMER') or hasRole('ADMIN') or hasRole('EMPLOYEE')")
-    public ResponseEntity<ApiResponse<AuthResponse.UserInfo>> getCurrentUser(Authentication authentication) {
-        try {
-            com.nexabank.auth.service.UserDetailsServiceImpl.UserPrincipal userPrincipal = 
-                (com.nexabank.auth.service.UserDetailsServiceImpl.UserPrincipal) authentication.getPrincipal();
-            
-            AuthResponse.UserInfo userInfo = new AuthResponse.UserInfo();
-            userInfo.setUserId(userPrincipal.getId());
-            userInfo.setEmail(userPrincipal.getUsername());
-            userInfo.setUserType(userPrincipal.getUserType());
-            
-            return ResponseEntity.ok(ApiResponse.success("User info retrieved successfully!", userInfo));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error(e.getMessage()));
-        }
-    }
-    
-    @GetMapping("/validate")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> validateToken(HttpServletRequest request) {
-        try {
-            String authHeader = request.getHeader("Authorization");
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(ApiResponse.error("No Bearer token found"));
-            }
-            
-            String token = authHeader.substring(7);
-            
-            // Validate JWT token properly
-            if (!jwtUtils.validateJwtToken(token)) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(ApiResponse.error("Invalid or expired token"));
-            }
-            
-            // Extract user information from token
-            String username = jwtUtils.getUserNameFromJwtToken(token);
-            String tokenType = jwtUtils.getTokenType(token);
-            
-            // Verify user still exists and is active
-            User user = userRepository.findByEmail(username)
-                    .orElse(null);
-            
-            if (user == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(ApiResponse.error("User not found"));
-            }
-            
-            if (user.getStatus() != User.UserStatus.ACTIVE) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(ApiResponse.error("User account is not active"));
-            }
-            
-            // Check if token type is correct (should be 'access' for regular requests)
-            if (!"access".equals(tokenType)) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(ApiResponse.error("Invalid token type"));
-            }
-            
-            // Return validation success with user info
-            Map<String, Object> tokenInfo = new HashMap<>();
-            tokenInfo.put("valid", true);
-            tokenInfo.put("username", username);
-            tokenInfo.put("userId", user.getUserId());
-            tokenInfo.put("userType", user.getUserType().toString());
-            tokenInfo.put("tokenType", tokenType);
-            tokenInfo.put("isExpired", jwtUtils.isTokenExpired(token));
-            
-            return ResponseEntity.ok(ApiResponse.success("Token is valid", tokenInfo));
-            
-        } catch (ExpiredJwtException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Token has expired"));
-        } catch (MalformedJwtException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Malformed token"));
-        } catch (Exception e) {
-            logger.error("Token validation error: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Token validation failed"));
+                .body(ApiResponse.error("Failed to check lockout status: " + e.getMessage()));
         }
     }
 }

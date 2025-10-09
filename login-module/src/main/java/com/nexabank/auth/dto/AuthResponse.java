@@ -1,74 +1,64 @@
 package com.nexabank.auth.dto;
 
 import com.nexabank.auth.entity.User;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class AuthResponse {
     
     private String accessToken;
     private String refreshToken;
-    private String tokenType = "Bearer";
+    private String tokenType;
     private Long expiresIn;
-    private UserInfo user;
+    private User user;
     
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class UserInfo {
-        private String userId;
-        private String email;
-        private String firstName;
-        private String lastName;
-        private String phoneNumber;
-        private User.UserType userType;
-        private User.UserStatus status;
-        private LocalDateTime lastLogin;
-        
-        // Masked PII data
-        private String maskedAadhar;
-        private String maskedPan;
-        
-        public static UserInfo fromUser(User user) {
-            UserInfo userInfo = new UserInfo();
-            userInfo.setUserId(user.getUserId());
-            userInfo.setEmail(user.getEmail());
-            userInfo.setFirstName(user.getFirstName());
-            userInfo.setLastName(user.getLastName());
-            userInfo.setPhoneNumber(user.getPhoneNumber());
-            userInfo.setUserType(user.getUserType());
-            userInfo.setStatus(user.getStatus());
-            userInfo.setLastLogin(user.getLastLogin());
-            
-            // Mask PII data
-            if (user.getAadharNumber() != null) {
-                userInfo.setMaskedAadhar(maskAadhar(user.getAadharNumber()));
-            }
-            if (user.getPanNumber() != null) {
-                userInfo.setMaskedPan(maskPan(user.getPanNumber()));
-            }
-            
-            return userInfo;
-        }
-        
-        private static String maskAadhar(String aadhar) {
-            if (aadhar == null || aadhar.length() < 4) {
-                return "****";
-            }
-            return "XXXX-XXXX-" + aadhar.substring(aadhar.length() - 4);
-        }
-        
-        private static String maskPan(String pan) {
-            if (pan == null || pan.length() < 4) {
-                return "****";
-            }
-            return "XXXXX" + pan.substring(pan.length() - 4);
-        }
+    // Constructors
+    public AuthResponse() {}
+    
+    public AuthResponse(String accessToken, String refreshToken, String tokenType, Long expiresIn, User user) {
+        this.accessToken = accessToken;
+        this.refreshToken = refreshToken;
+        this.tokenType = tokenType;
+        this.expiresIn = expiresIn;
+        this.user = user;
+    }
+    
+    // Getters and Setters
+    public String getAccessToken() {
+        return accessToken;
+    }
+    
+    public void setAccessToken(String accessToken) {
+        this.accessToken = accessToken;
+    }
+    
+    public String getRefreshToken() {
+        return refreshToken;
+    }
+    
+    public void setRefreshToken(String refreshToken) {
+        this.refreshToken = refreshToken;
+    }
+    
+    public String getTokenType() {
+        return tokenType;
+    }
+    
+    public void setTokenType(String tokenType) {
+        this.tokenType = tokenType;
+    }
+    
+    public Long getExpiresIn() {
+        return expiresIn;
+    }
+    
+    public void setExpiresIn(Long expiresIn) {
+        this.expiresIn = expiresIn;
+    }
+    
+    public User getUser() {
+        return user;
+    }
+    
+    public void setUser(User user) {
+        this.user = user;
     }
 }

@@ -20,16 +20,12 @@ const BankingHeader: React.FC = () => {
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const [showMobileMenu, setShowMobileMenu] = React.useState(false);
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      // Redirect to login module (external redirect)
-      window.location.href = 'http://localhost:5173';
-    } catch (error) {
-      console.error('Logout failed:', error);
-      // Even if logout API fails, redirect to login
-      window.location.href = 'http://localhost:5173';
-    }
+  const handleLogout = () => {
+    logout(() => {
+      // This callback ensures navigation happens after the state is cleared
+      // Include a marker so the login app clears its own tokens as well
+      window.location.href = 'http://localhost:5173?loggedOut=1';
+    });
   };
 
   const navigationItems = [

@@ -1,247 +1,193 @@
 package com.nexabank.auth.controller;
 
 import com.nexabank.auth.dto.ApiResponse;
-import com.nexabank.auth.dto.CreateUserRequest;
-import com.nexabank.auth.dto.UserDto;
-import com.nexabank.auth.service.AdminService;
-import jakarta.validation.Valid;
+import com.nexabank.auth.entity.User;
+import com.nexabank.auth.service.JwtTokenService;
+import com.nexabank.auth.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.*;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
-@PreAuthorize("hasRole('ADMIN')")
-@CrossOrigin(origins = "*", maxAge = 3600)
+@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:5174"}, allowCredentials = "true")
 public class AdminController {
 
     @Autowired
-    private AdminService adminService;
-    
+    private UserService userService;
+
     @Autowired
-    private RestTemplate restTemplate;
-    
-    private static final String CUSTOMER_SERVICE_URL = "http://localhost:8081/api";
+    private JwtTokenService jwtTokenService;
 
     @GetMapping("/users")
-    public ResponseEntity<ApiResponse<List<UserDto>>> getAllUsers(
-            @RequestParam(required = false) String userType,
-            @RequestParam(required = false) String status) {
+    public ResponseEntity<?> getAllUsers(@RequestHeader("Authorization") String authHeader) {
         try {
-            // Redirect to customer service for unified user management
-            StringBuilder url = new StringBuilder(CUSTOMER_SERVICE_URL + "/admin/users");
-            boolean hasParams = false;
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Missing or invalid authorization header"));
+            }
+
+            String token = authHeader.substring(7);
             
-            if (userType != null && !userType.isEmpty()) {
-                url.append("?userType=").append(userType);
-                hasParams = true;
+            // Check if user has admin privileges
+            if (!jwtTokenService.isAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Insufficient privileges. Admin access required."));
             }
+
+            // Get all users (in a real system, you'd paginate this)
+            List<User> users = userService.getAllUsers();
             
-            if (status != null && !status.isEmpty()) {
-                url.append(hasParams ? "&" : "?").append("status=").append(status);
-            }
+            // Remove sensitive information before returning
+            List<Map<String, Object>> sanitizedUsers = users.stream().map(user -> {
+                Map<String, Object> userMap = new HashMap<>();
+                userMap.put("userId", user.getUserId());
+                userMap.put("email", user.getEmail());
+                userMap.put("userType", user.getUserType());
+                userMap.put("status", user.getStatus());
+                userMap.put("roles", user.getRoles());
+                userMap.put("lastLogin", user.getLastLogin());
+                userMap.put("failedLoginAttempts", user.getFailedLoginAttempts());
+                userMap.put("createdAt", user.getCreatedAt());
+                return userMap;
+            }).toList();
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<?> entity = new HttpEntity<>(headers);
-
-            ResponseEntity<ApiResponse<List<UserDto>>> response = restTemplate.exchange(
-                url.toString(),
-                HttpMethod.GET,
-                entity,
-                new ParameterizedTypeReference<ApiResponse<List<UserDto>>>() {}
-            );
-
-            if (response.getBody() != null && response.getBody().isSuccess()) {
-                return ResponseEntity.ok(ApiResponse.success("Users retrieved successfully", response.getBody().getData()));
-            } else {
-                return ResponseEntity.badRequest()
-                        .body(ApiResponse.error("Failed to retrieve users from customer service"));
-            }
+            return ResponseEntity.ok(ApiResponse.success("Users retrieved successfully", sanitizedUsers));
+            
         } catch (Exception e) {
-            // Fallback to local auth service if customer service is unavailable
-            List<UserDto> users = adminService.getAllUsers(userType, status);
-            return ResponseEntity.ok(ApiResponse.success("Users retrieved successfully (from auth service)", users));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Failed to retrieve users: " + e.getMessage()));
         }
     }
 
-    @GetMapping("/users/{userId}")
-    public ResponseEntity<ApiResponse<UserDto>> getUserById(@PathVariable String userId) {
-        try {
-            // Redirect to customer service
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<?> entity = new HttpEntity<>(headers);
-
-            ResponseEntity<ApiResponse<UserDto>> response = restTemplate.exchange(
-                CUSTOMER_SERVICE_URL + "/admin/users/" + userId,
-                HttpMethod.GET,
-                entity,
-                new ParameterizedTypeReference<ApiResponse<UserDto>>() {}
-            );
-
-            if (response.getBody() != null && response.getBody().isSuccess()) {
-                return ResponseEntity.ok(ApiResponse.success("User retrieved successfully", response.getBody().getData()));
-            } else {
-                return ResponseEntity.badRequest()
-                        .body(ApiResponse.error("Failed to retrieve user from customer service"));
-            }
-        } catch (Exception e) {
-            // Fallback to local auth service
-            try {
-                UserDto user = adminService.getUserById(userId);
-                return ResponseEntity.ok(ApiResponse.success("User retrieved successfully (from auth service)", user));
-            } catch (Exception fallbackException) {
-                return ResponseEntity.badRequest()
-                        .body(ApiResponse.error("Failed to retrieve user: " + fallbackException.getMessage()));
-            }
-        }
-    }
-
-    @PostMapping("/users")
-    public ResponseEntity<ApiResponse<UserDto>> createUser(@Valid @RequestBody CreateUserRequest request) {
-        try {
-            // Redirect user creation to customer service
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<CreateUserRequest> entity = new HttpEntity<>(request, headers);
-
-            ResponseEntity<ApiResponse<UserDto>> response = restTemplate.exchange(
-                CUSTOMER_SERVICE_URL + "/admin/users",
-                HttpMethod.POST,
-                entity,
-                new ParameterizedTypeReference<ApiResponse<UserDto>>() {}
-            );
-
-            if (response.getBody() != null && response.getBody().isSuccess()) {
-                return ResponseEntity.ok(ApiResponse.success("User created successfully", response.getBody().getData()));
-            } else {
-                return ResponseEntity.badRequest()
-                        .body(ApiResponse.error("Failed to create user in customer service"));
-            }
-        } catch (Exception e) {
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("Failed to create user: " + e.getMessage()));
-        }
-    }
-
-    @PutMapping("/users/{userId}")
-    public ResponseEntity<ApiResponse<UserDto>> updateUser(
+    @PutMapping("/users/{userId}/roles")
+    public ResponseEntity<?> updateUserRoles(
             @PathVariable String userId,
-            @Valid @RequestBody UserDto userDto) {
+            @RequestBody Map<String, Object> request,
+            @RequestHeader("Authorization") String authHeader) {
         try {
-            // Redirect to customer service
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<UserDto> entity = new HttpEntity<>(userDto, headers);
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Missing or invalid authorization header"));
+            }
 
-            ResponseEntity<ApiResponse<UserDto>> response = restTemplate.exchange(
-                CUSTOMER_SERVICE_URL + "/admin/users/" + userId,
-                HttpMethod.PUT,
-                entity,
-                new ParameterizedTypeReference<ApiResponse<UserDto>>() {}
-            );
+            String token = authHeader.substring(7);
+            
+            // Check if user has admin privileges
+            if (!jwtTokenService.hasRole(token, User.Role.ADMIN_USER_MANAGEMENT)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Insufficient privileges. User management access required."));
+            }
 
-            if (response.getBody() != null && response.getBody().isSuccess()) {
-                return ResponseEntity.ok(ApiResponse.success("User updated successfully", response.getBody().getData()));
+            String action = (String) request.get("action"); // "add" or "remove"
+            String roleName = (String) request.get("role");
+            
+            if (action == null || roleName == null) {
+                return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Action and role are required"));
+            }
+
+            User.Role role;
+            try {
+                role = User.Role.valueOf(roleName);
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Invalid role: " + roleName));
+            }
+
+            if ("add".equals(action)) {
+                userService.addRoleToUser(userId, role);
+            } else if ("remove".equals(action)) {
+                userService.removeRoleFromUser(userId, role);
             } else {
                 return ResponseEntity.badRequest()
-                        .body(ApiResponse.error("Failed to update user in customer service"));
+                    .body(ApiResponse.error("Invalid action. Use 'add' or 'remove'"));
             }
+
+            return ResponseEntity.ok(ApiResponse.success("User role updated successfully"));
+            
         } catch (Exception e) {
-            // Fallback to local auth service
-            try {
-                UserDto updatedUser = adminService.updateUser(userId, userDto);
-                return ResponseEntity.ok(ApiResponse.success("User updated successfully (in auth service)", updatedUser));
-            } catch (Exception fallbackException) {
-                return ResponseEntity.badRequest()
-                        .body(ApiResponse.error("Failed to update user: " + fallbackException.getMessage()));
-            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Failed to update user role: " + e.getMessage()));
         }
     }
 
     @PutMapping("/users/{userId}/status")
-    public ResponseEntity<ApiResponse<UserDto>> updateUserStatus(
+    public ResponseEntity<?> updateUserStatus(
             @PathVariable String userId,
-            @RequestParam String status) {
+            @RequestBody Map<String, Object> request,
+            @RequestHeader("Authorization") String authHeader) {
         try {
-            // Redirect to customer service
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<?> entity = new HttpEntity<>(headers);
-
-            ResponseEntity<ApiResponse<UserDto>> response = restTemplate.exchange(
-                CUSTOMER_SERVICE_URL + "/admin/users/" + userId + "/status?status=" + status,
-                HttpMethod.PUT,
-                entity,
-                new ParameterizedTypeReference<ApiResponse<UserDto>>() {}
-            );
-
-            if (response.getBody() != null && response.getBody().isSuccess()) {
-                return ResponseEntity.ok(ApiResponse.success("User status updated successfully", response.getBody().getData()));
-            } else {
-                return ResponseEntity.badRequest()
-                        .body(ApiResponse.error("Failed to update user status in customer service"));
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Missing or invalid authorization header"));
             }
-        } catch (Exception e) {
-            // Fallback to local auth service
+
+            String token = authHeader.substring(7);
+            
+            // Check if user has admin privileges
+            if (!jwtTokenService.hasRole(token, User.Role.ADMIN_USER_MANAGEMENT)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Insufficient privileges. User management access required."));
+            }
+
+            String statusName = (String) request.get("status");
+            
+            if (statusName == null) {
+                return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Status is required"));
+            }
+
+            User.UserStatus status;
             try {
-                UserDto updatedUser = adminService.updateUserStatus(userId, status);
-                return ResponseEntity.ok(ApiResponse.success("User status updated successfully (in auth service)", updatedUser));
-            } catch (Exception fallbackException) {
+                status = User.UserStatus.valueOf(statusName);
+            } catch (IllegalArgumentException e) {
                 return ResponseEntity.badRequest()
-                        .body(ApiResponse.error("Failed to update user status: " + fallbackException.getMessage()));
+                    .body(ApiResponse.error("Invalid status: " + statusName));
             }
+
+            boolean updated = userService.updateUserStatus(userId, status);
+            
+            if (updated) {
+                return ResponseEntity.ok(ApiResponse.success("User status updated successfully"));
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+            
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Failed to update user status: " + e.getMessage()));
         }
     }
 
-    @DeleteMapping("/users/{userId}")
-    public ResponseEntity<ApiResponse<String>> deleteUser(@PathVariable String userId) {
+    @GetMapping("/dashboard/stats")
+    public ResponseEntity<?> getDashboardStats(@RequestHeader("Authorization") String authHeader) {
         try {
-            // Redirect to customer service
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<?> entity = new HttpEntity<>(headers);
-
-            ResponseEntity<ApiResponse<String>> response = restTemplate.exchange(
-                CUSTOMER_SERVICE_URL + "/admin/users/" + userId,
-                HttpMethod.DELETE,
-                entity,
-                new ParameterizedTypeReference<ApiResponse<String>>() {}
-            );
-
-            if (response.getBody() != null && response.getBody().isSuccess()) {
-                return ResponseEntity.ok(ApiResponse.success("", "User deleted successfully"));
-            } else {
-                return ResponseEntity.badRequest()
-                        .body(ApiResponse.error("Failed to delete user in customer service"));
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Missing or invalid authorization header"));
             }
-        } catch (Exception e) {
-            // Fallback to local auth service
-            try {
-                adminService.deleteUser(userId);
-                return ResponseEntity.ok(ApiResponse.success("", "User deleted successfully (from auth service)"));
-            } catch (Exception fallbackException) {
-                return ResponseEntity.badRequest()
-                        .body(ApiResponse.error("Failed to delete user: " + fallbackException.getMessage()));
-            }
-        }
-    }
 
-    @GetMapping("/stats")
-    public ResponseEntity<ApiResponse<Map<String, Integer>>> getAdminStats() {
-        try {
-            Map<String, Integer> stats = adminService.getAdminStats();
-            return ResponseEntity.ok(ApiResponse.success("Admin statistics retrieved successfully", stats));
+            String token = authHeader.substring(7);
+            
+            // Check if user has admin privileges
+            if (!jwtTokenService.isAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Insufficient privileges. Admin access required."));
+            }
+
+            Map<String, Object> stats = userService.getUserStatistics();
+            
+            return ResponseEntity.ok(ApiResponse.success("Dashboard stats retrieved successfully", stats));
+            
         } catch (Exception e) {
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("Failed to retrieve admin statistics: " + e.getMessage()));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Failed to retrieve dashboard stats: " + e.getMessage()));
         }
     }
 }

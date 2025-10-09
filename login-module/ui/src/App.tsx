@@ -7,6 +7,22 @@ import { useAuth } from './contexts/AuthContext';
 const App: React.FC = () => {
   const { isAuthenticated, isLoading, user } = useAuth();
 
+  // Check for logout/session flags that should suppress auto-redirect
+  const params = new URLSearchParams(window.location.search);
+  const suppressRedirect = params.get('loggedOut') === '1' || params.get('session') === 'expired';
+
+  // Move useEffect to top level to avoid hooks order issues
+  React.useEffect(() => {
+    if (!suppressRedirect && isAuthenticated && user) {
+      // Small delay to ensure auth state is stable
+      const timer = setTimeout(() => {
+        redirectToDashboard();
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated, user, suppressRedirect]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -40,12 +56,6 @@ const App: React.FC = () => {
     }
   };
 
-  React.useEffect(() => {
-    if (isAuthenticated && user) {
-      redirectToDashboard();
-    }
-  }, [isAuthenticated, user]);
-
   return (
     <Routes>
       {/* Public routes */}
@@ -70,7 +80,40 @@ const App: React.FC = () => {
               </div>
             </div>
           ) : (
-            <Navigate to="/login" replace />
+            // Check for logout/session flags to show appropriate message
+            (() => {
+              const loggedOut = params.get('loggedOut') === '1';
+              const sessionExpired = params.get('session') === 'expired';
+              
+              if (loggedOut || sessionExpired) {
+                return (
+                  <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                    <div className="text-center max-w-md">
+                      <h1 className="text-2xl font-bold text-gray-900 mb-4">
+                        {loggedOut ? 'Logged Out Successfully' : 'Session Expired'}
+                      </h1>
+                      <p className="text-gray-600 mb-6">
+                        {loggedOut 
+                          ? 'You have been successfully logged out from all services.' 
+                          : 'Your session has expired. Please log in again to continue.'}
+                      </p>
+                      <button
+                        onClick={() => {
+                          // Clean URL and navigate to login
+                          window.history.replaceState({}, '', '/login');
+                          window.location.pathname = '/login';
+                        }}
+                        className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Continue to Login
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+              
+              return <Navigate to="/login" replace />;
+            })()
           )
         }
       />

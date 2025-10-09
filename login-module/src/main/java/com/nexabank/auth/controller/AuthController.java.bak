@@ -1,0 +1,174 @@
+package com.nexabank.auth.controller;
+
+import com.nexabank.auth.dto.*;
+import com.nexabank.auth.entity.User;
+import com.nexabank.auth.entity.UserSession;
+import com.nexabank.auth.exception.AuthenticationException;
+import com.nexabank.auth.exception.UserAlreadyExistsException;
+import com.nexabank.auth.service.JwtTokenService;
+import com.nexabank.auth.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/auth")
+@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
+public class AuthController {
+
+    @Autowired
+    private UserService userService;
+
+    @Autowired
+    private JwtTokenService jwtTokenService;
+
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest loginRequest, 
+                                                         HttpServletRequest request) {
+        try {
+            // Authenticate user
+            User user = userService.authenticate(loginRequest.getEmail(), loginRequest.getPassword());
+            
+            // Generate tokens
+            String accessToken = jwtTokenService.generateAccessToken(user.getEmail());
+            String refreshToken = jwtTokenService.generateRefreshToken(user.getEmail());
+            
+            // Create user session
+            String userAgent = request.getHeader("User-Agent");
+            String ipAddress = getClientIpAddress(request);
+            userService.createUserSession(user, accessToken, refreshToken, userAgent, ipAddress);
+            
+            // Build response
+            AuthResponse authResponse = new AuthResponse();
+            authResponse.setAccessToken(accessToken);
+            authResponse.setRefreshToken(refreshToken);
+            authResponse.setTokenType("Bearer");
+            authResponse.setExpiresIn(86400L); // 24 hours in seconds
+            authResponse.setUser(user);
+            
+            return ResponseEntity.ok(ApiResponse.success("Login successful", authResponse));
+            
+        } catch (AuthenticationException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("An error occurred during login"));
+        }
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest registerRequest, 
+                                                            HttpServletRequest request) {
+        try {
+            // Register new user
+            User user = userService.registerUser(
+                registerRequest.getEmail(),
+                registerRequest.getPassword(),
+                registerRequest.getFirstName(),
+                registerRequest.getLastName(),
+                registerRequest.getPhoneNumber(),
+                registerRequest.getUserType()
+            );
+            
+            // Generate tokens
+            String accessToken = jwtTokenService.generateAccessToken(user.getEmail());
+            String refreshToken = jwtTokenService.generateRefreshToken(user.getEmail());
+            
+            // Create user session
+            String userAgent = request.getHeader("User-Agent");
+            String ipAddress = getClientIpAddress(request);
+            userService.createUserSession(user, accessToken, refreshToken, userAgent, ipAddress);
+            
+            // Build response
+            AuthResponse authResponse = new AuthResponse();
+            authResponse.setAccessToken(accessToken);
+            authResponse.setRefreshToken(refreshToken);
+            authResponse.setTokenType("Bearer");
+            authResponse.setExpiresIn(86400L); // 24 hours in seconds
+            authResponse.setUser(user);
+            
+            return ResponseEntity.ok(ApiResponse.success("Registration successful", authResponse));
+            
+        } catch (UserAlreadyExistsException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("An error occurred during registration"));
+        }
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<String>> logout(HttpServletRequest request) {
+        try {
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                String accessToken = authHeader.substring(7);
+                userService.logoutUser(accessToken);
+                return ResponseEntity.ok(ApiResponse.success("Logout successful"));
+            }
+            return ResponseEntity.badRequest().body(ApiResponse.error("No valid token provided"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("An error occurred during logout"));
+        }
+    }
+
+    @PostMapping("/logout-all")
+    public ResponseEntity<ApiResponse<String>> logoutAll(Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            User user = userService.findByEmail(email)
+                    .orElseThrow(() -> new AuthenticationException("User not found"));
+            
+            userService.logoutAllUserDevices(user.getUserId());
+            return ResponseEntity.ok(ApiResponse.success("All devices logged out successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("An error occurred during logout"));
+        }
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(@Valid @RequestBody RefreshTokenRequest refreshTokenRequest) {
+        try {
+            UserSession session = userService.refreshUserSession(refreshTokenRequest.getRefreshToken());
+            
+            // Build response
+            AuthResponse authResponse = new AuthResponse();
+            authResponse.setAccessToken(session.getAccessToken());
+            authResponse.setRefreshToken(session.getRefreshToken());
+            authResponse.setTokenType("Bearer");
+            authResponse.setExpiresIn(86400L); // 24 hours in seconds
+            authResponse.setUser(session.getUser());
+            
+            return ResponseEntity.ok(ApiResponse.success("Token refreshed successfully", authResponse));
+            
+        } catch (AuthenticationException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("An error occurred during token refresh"));
+        }
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<User>> getCurrentUser(Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            User user = userService.findByEmail(email)
+                    .orElseThrow(() -> new AuthenticationException("User not found"));
+            
+            return ResponseEntity.ok(ApiResponse.success("User details retrieved successfully", user));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.error("An error occurred while retrieving user details"));
+        }
+    }
+
+    private String getClientIpAddress(HttpServletRequest request) {
+        String xForwardedForHeader = request.getHeader("X-Forwarded-For");
+        if (xForwardedForHeader == null) {
+            return request.getRemoteAddr();
+        } else {
+            return xForwardedForHeader.split(",")[0];
+        }
+    }
+}

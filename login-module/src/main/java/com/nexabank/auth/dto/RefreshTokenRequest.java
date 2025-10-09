@@ -3,7 +3,8 @@ package com.nexabank.auth.dto;
 import jakarta.validation.constraints.NotBlank;
 
 public class RefreshTokenRequest {
-    @NotBlank
+    
+    @NotBlank(message = "Refresh token is required")
     private String refreshToken;
 
     public RefreshTokenRequest() {}

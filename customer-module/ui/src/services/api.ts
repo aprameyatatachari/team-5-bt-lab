@@ -48,10 +48,10 @@ api.interceptors.response.use(
           return api(originalRequest);
         }
       } catch (refreshError) {
-        // Refresh failed, redirect to login
+        // Refresh failed, clear and redirect to login module
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
-        window.location.href = '/login';
+        window.location.href = 'http://localhost:5173?session=expired';
         return Promise.reject(refreshError);
       }
     }

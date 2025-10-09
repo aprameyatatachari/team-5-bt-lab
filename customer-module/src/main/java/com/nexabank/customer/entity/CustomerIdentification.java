@@ -28,6 +28,11 @@ public class CustomerIdentification {
     @Column(name = "effective_date", nullable = false)
     private LocalDateTime effectiveDate;
     
+    // Relationship with Customer
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_number", nullable = false)
+    private Customer customer;
+    
     @Column(name = "created_at")
     private LocalDateTime createdAt;
     

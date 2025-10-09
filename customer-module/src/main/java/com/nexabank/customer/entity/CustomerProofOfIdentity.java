@@ -44,10 +44,10 @@ public class CustomerProofOfIdentity {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
-    // Relationship with CustomerDetails
+    // Relationship with Customer
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_number", insertable = false, updatable = false)
-    private CustomerDetails customerDetails;
+    private Customer customer;
     
     @PrePersist
     protected void onCreate() {
