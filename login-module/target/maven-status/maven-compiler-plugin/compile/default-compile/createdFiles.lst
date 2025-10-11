@@ -21,7 +21,6 @@ com\nexabank\auth\service\RedisSessionService.class
 com\nexabank\auth\config\SecurityConfig.class
 com\nexabank\auth\service\JwtTokenService.class
 com\nexabank\auth\config\RestTemplateConfig.class
-com\nexabank\auth\controller\AuthController.class
 com\nexabank\auth\exception\AuthenticationException.class
 com\nexabank\auth\AuthServiceApplication.class
 com\nexabank\auth\service\UserService.class

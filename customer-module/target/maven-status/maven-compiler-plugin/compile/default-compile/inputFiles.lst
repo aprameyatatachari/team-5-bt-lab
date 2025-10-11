@@ -1,6 +1,6 @@
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\customer-module\src\main\java\com\nexabank\customer\config\RestTemplateConfig.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\customer-module\src\main\java\com\nexabank\customer\config\SecurityConfig.java
-C:\Users\hp\Documents\GitHub\team-5-bt-lab\customer-module\src\main\java\com\nexabank\customer\controller\CustomerController.java
+C:\Users\hp\Documents\GitHub\team-5-bt-lab\customer-module\src\main\java\com\nexabank\customer\config\SwaggerConfig.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\customer-module\src\main\java\com\nexabank\customer\controller\HealthController.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\customer-module\src\main\java\com\nexabank\customer\controller\UserProfileController.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\customer-module\src\main\java\com\nexabank\customer\CustomerServiceApplication.java

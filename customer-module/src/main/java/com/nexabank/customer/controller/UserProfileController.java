@@ -10,6 +10,14 @@ import com.nexabank.customer.service.CustomerService;
 import com.nexabank.customer.service.CustomerIdentificationService;
 import com.nexabank.customer.service.CustomerNameComponentService;
 import com.nexabank.customer.service.CustomerProofOfIdentityService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +35,8 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/profiles")
 @CrossOrigin(origins = "*")
+@Tag(name = "Customer Profile Management", description = "Complete CRUD operations for customer profiles and banking information")
+@SecurityRequirement(name = "bearerAuth")
 public class UserProfileController {
     
     @Autowired
@@ -45,7 +55,21 @@ public class UserProfileController {
      * Create new customer profile (called by auth-module during registration)
      */
     @PostMapping
-    public ResponseEntity<?> createProfile(@RequestBody CreateUserProfileRequest request) {
+    @Operation(
+        summary = "Create new customer profile",
+        description = "Creates a new customer profile with normalized data structure. This endpoint is typically called by the authentication module during user registration."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "201", description = "Customer profile created successfully", 
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserProfileResponse.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid request data or customer already exists", 
+                    content = @Content(mediaType = "application/json")),
+        @ApiResponse(responseCode = "500", description = "Internal server error", 
+                    content = @Content(mediaType = "application/json"))
+    })
+    public ResponseEntity<?> createProfile(
+        @Parameter(description = "Customer profile creation request", required = true)
+        @RequestBody CreateUserProfileRequest request) {
         try {
             // Check if customer already exists
             if (customerService.existsByUserId(request.getUserId())) {
@@ -153,7 +177,21 @@ public class UserProfileController {
      * Get profile by userId (for other modules)
      */
     @GetMapping("/user/{userId}")
-    public ResponseEntity<?> getProfileByUserId(@PathVariable String userId) {
+    @Operation(
+        summary = "Get customer profile by user ID",
+        description = "Retrieves customer profile information using the user ID from the authentication module. This is the primary endpoint for inter-module communication."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Customer profile found", 
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserProfileResponse.class))),
+        @ApiResponse(responseCode = "404", description = "Customer profile not found", 
+                    content = @Content(mediaType = "application/json")),
+        @ApiResponse(responseCode = "500", description = "Internal server error", 
+                    content = @Content(mediaType = "application/json"))
+    })
+    public ResponseEntity<?> getProfileByUserId(
+        @Parameter(description = "User ID from authentication module", required = true, example = "user123")
+        @PathVariable String userId) {
         try {
             Customer customer = customerService.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Customer profile not found for userId: " + userId));

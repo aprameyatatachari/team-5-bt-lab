@@ -7,6 +7,7 @@ import com.nexabank.auth.exception.UserAlreadyExistsException;
 import com.nexabank.auth.service.UserService;
 import com.nexabank.auth.service.JwtTokenService;
 import com.nexabank.auth.service.RedisSessionService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,7 @@ import java.util.HashMap;
 @RestController
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
+@Tag(name = "Authentication Management", description = "User authentication, registration, and session management operations")
 public class AuthController {
 
     @Autowired
@@ -97,13 +99,13 @@ public class AuthController {
             authResponse.setUser(user);
             
             return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("User registered successfully", authResponse));
+                .body(com.nexabank.auth.dto.ApiResponse.success("User registered successfully", authResponse));
         } catch (UserAlreadyExistsException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiResponse.error("User with this email already exists"));
+                .body(com.nexabank.auth.dto.ApiResponse.error("User with this email already exists"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Registration failed: " + e.getMessage()));
+                .body(com.nexabank.auth.dto.ApiResponse.error("Registration failed: " + e.getMessage()));
         }
     }
 
@@ -132,10 +134,10 @@ public class AuthController {
                 }
             }
             
-            return ResponseEntity.ok(ApiResponse.success("Logged out successfully"));
+            return ResponseEntity.ok(com.nexabank.auth.dto.ApiResponse.success("Logged out successfully"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Logout failed: " + e.getMessage()));
+                .body(com.nexabank.auth.dto.ApiResponse.error("Logout failed: " + e.getMessage()));
         }
     }
 
@@ -149,7 +151,7 @@ public class AuthController {
                 if (redisSessionService.isUserLockedOut(email)) {
                     long remainingTime = redisSessionService.getRemainingLockoutTime(email);
                     return ResponseEntity.status(HttpStatus.LOCKED)
-                        .body(ApiResponse.error("Account locked. Please try again in " + remainingTime + " seconds"));
+                        .body(com.nexabank.auth.dto.ApiResponse.error("Account locked. Please try again in " + remainingTime + " seconds"));
                 }
                 
                 var userOptional = userService.findByEmail(email);
@@ -173,15 +175,15 @@ public class AuthController {
                     authResponse.setExpiresIn(86400L); // 24 hours in seconds
                     authResponse.setUser(user);
                     
-                    return ResponseEntity.ok(ApiResponse.success("Token refreshed successfully", authResponse));
+                    return ResponseEntity.ok(com.nexabank.auth.dto.ApiResponse.success("Token refreshed successfully", authResponse));
                 }
             }
             
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error("Invalid refresh token"));
+                .body(com.nexabank.auth.dto.ApiResponse.error("Invalid refresh token"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Token refresh failed: " + e.getMessage()));
+                .body(com.nexabank.auth.dto.ApiResponse.error("Token refresh failed: " + e.getMessage()));
         }
     }
 
@@ -194,13 +196,13 @@ public class AuthController {
             if (isLockedOut) {
                 Map<String, Object> lockoutData = new HashMap<>();
                 lockoutData.put("remainingTime", remainingTime);
-                return ResponseEntity.ok(ApiResponse.success("User is locked out", lockoutData));
+                return ResponseEntity.ok(com.nexabank.auth.dto.ApiResponse.success("User is locked out", lockoutData));
             } else {
-                return ResponseEntity.ok(ApiResponse.success("User is not locked out"));
+                return ResponseEntity.ok(com.nexabank.auth.dto.ApiResponse.success("User is not locked out"));
             }
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Failed to check lockout status: " + e.getMessage()));
+                .body(com.nexabank.auth.dto.ApiResponse.error("Failed to check lockout status: " + e.getMessage()));
         }
     }
 
@@ -213,7 +215,7 @@ public class AuthController {
         try {
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ApiResponse.error("Missing or invalid Authorization header"));
+                    .body(com.nexabank.auth.dto.ApiResponse.error("Missing or invalid Authorization header"));
             }
 
             String token = authHeader.substring(7);
@@ -221,7 +223,7 @@ public class AuthController {
             // Check if token is on denylist
             if (jwtTokenService.isTokenDenylisted(token)) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Token has been invalidated"));
+                    .body(com.nexabank.auth.dto.ApiResponse.error("Token has been invalidated"));
             }
 
             // Validate token
@@ -238,7 +240,7 @@ public class AuthController {
                     // Check if user is still active
                     if (user.getStatus() != User.UserStatus.ACTIVE) {
                         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                            .body(ApiResponse.error("User account is inactive"));
+                            .body(com.nexabank.auth.dto.ApiResponse.error("User account is inactive"));
                     }
                     
                     // Return validation success with user info
@@ -250,18 +252,18 @@ public class AuthController {
                     validationData.put("roles", user.getRoles());
                     validationData.put("status", user.getStatus());
                     
-                    return ResponseEntity.ok(ApiResponse.success("Token is valid", validationData));
+                    return ResponseEntity.ok(com.nexabank.auth.dto.ApiResponse.success("Token is valid", validationData));
                 } else {
                     return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(ApiResponse.error("User not found"));
+                        .body(com.nexabank.auth.dto.ApiResponse.error("User not found"));
                 }
             } else {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Invalid token"));
+                    .body(com.nexabank.auth.dto.ApiResponse.error("Invalid token"));
             }
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error("Token validation failed: " + e.getMessage()));
+                .body(com.nexabank.auth.dto.ApiResponse.error("Token validation failed: " + e.getMessage()));
         }
     }
 }
