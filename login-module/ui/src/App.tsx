@@ -14,10 +14,10 @@ const App: React.FC = () => {
   // Move useEffect to top level to avoid hooks order issues
   React.useEffect(() => {
     if (!suppressRedirect && isAuthenticated && user) {
-      // Small delay to ensure auth state is stable
+      // Delay to show welcome message and ensure auth state is stable
       const timer = setTimeout(() => {
         redirectToDashboard();
-      }, 100);
+      }, 1500); // Increased from 100ms to 1.5s to show welcome message
       
       return () => clearTimeout(timer);
     }
@@ -50,9 +50,15 @@ const App: React.FC = () => {
         user: JSON.stringify(user)
       });
       
-      // Redirect to appropriate customer module based on role
+      // Clear the login module's auth state before redirecting
+      // This ensures when user comes back, login module shows login page
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      
+      // Redirect to appropriate customer module based on role - use replace to clear this page
       const customerModuleUrl = `http://localhost:5174?${params.toString()}`;
-      window.location.href = customerModuleUrl;
+      window.location.replace(customerModuleUrl);
     }
   };
 
@@ -73,10 +79,16 @@ const App: React.FC = () => {
         path="/"
         element={
           isAuthenticated ? (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-              <div className="text-center">
+            // Show welcome screen while redirecting
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+              <div className="text-center bg-white rounded-lg shadow-lg p-8 max-w-md">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-600">Redirecting to dashboard...</p>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  Welcome back, {user?.firstName || 'User'}!
+                </h2>
+                <p className="text-gray-600">
+                  Taking you to your dashboard...
+                </p>
               </div>
             </div>
           ) : (

@@ -1,29 +1,62 @@
 package com.nexabank.auth.service;
 
 import com.nexabank.auth.entity.User;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 public class JwtTokenService {
 
-    @Value("${jwt.secret:mySecretKey}")
+    @Value("${jwt.secret:mySecretKeyThatShouldBeAtLeast32CharactersLongForSecurity}")
     private String jwtSecret;
 
     @Value("${jwt.expiration:86400000}") // 24 hours in milliseconds
     private long jwtExpiration;
 
-    // Simplified JWT implementation with role support
+    @Autowired
+    private RedisSessionService redisSessionService;
+
+    private SecretKey getSigningKey() {
+        // Ensure secret is at least 32 characters for security
+        String secret = jwtSecret;
+        if (secret.length() < 32) {
+            secret = secret + "padding".repeat((32 - secret.length()) / 7 + 1);
+            secret = secret.substring(0, 32);
+        }
+        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    }
+
     public String generateToken(String email, String userId, String userType, Set<User.Role> roles) {
+        String jti = UUID.randomUUID().toString(); // Unique JWT ID
+        Date now = new Date();
+        Date expiration = new Date(now.getTime() + jwtExpiration);
+        
         // Convert roles to string representation
         String rolesString = roles != null ? 
             roles.stream().map(Enum::name).collect(Collectors.joining(",")) : "";
-            
-        // Enhanced token format with roles
-        return "JWT_" + email + "_" + userId + "_" + userType + "_" + rolesString + "_" + System.currentTimeMillis();
+        
+        return Jwts.builder()
+                .subject(email)
+                .id(jti) // JWT ID for denylist tracking
+                .claim("userId", userId)
+                .claim("userType", userType)
+                .claim("roles", rolesString)
+                .issuedAt(now)
+                .expiration(expiration)
+                .signWith(getSigningKey())
+                .compact();
     }
 
     public String generateTokenForUser(User user) {
@@ -31,50 +64,103 @@ public class JwtTokenService {
     }
 
     public boolean validateToken(String token) {
-        // Simple validation - check if token starts with JWT_ and has valid parts
-        if (token == null || !token.startsWith("JWT_")) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+                    
+            // Check if token is on denylist (blacklisted)
+            String jti = claims.getId();
+            if (jti != null && redisSessionService.isTokenDenylisted(jti)) {
+                System.out.println("Token rejected: JWT ID " + jti + " is on denylist");
+                return false;
+            }
+            
+            return true; // Token is valid and not denylisted
+        } catch (Exception e) {
+            System.err.println("Token validation failed: " + e.getMessage());
             return false;
         }
-        
-        String[] parts = token.split("_");
-        return parts.length >= 5; // email, userId, userType, roles, timestamp
     }
 
     public String extractUsername(String token) {
-        if (token != null && token.startsWith("JWT_")) {
-            String[] parts = token.split("_");
-            if (parts.length > 1) {
-                return parts[1];
-            }
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            return claims.getSubject();
+        } catch (Exception e) {
+            return null;
         }
-        return null;
     }
 
     public String extractUserId(String token) {
-        if (token != null && token.startsWith("JWT_")) {
-            String[] parts = token.split("_");
-            if (parts.length > 2) {
-                return parts[2];
-            }
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            return claims.get("userId", String.class);
+        } catch (Exception e) {
+            return null;
         }
-        return null;
     }
 
     public String extractUserType(String token) {
-        if (token != null && token.startsWith("JWT_")) {
-            String[] parts = token.split("_");
-            if (parts.length > 3) {
-                return parts[3];
-            }
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            return claims.get("userType", String.class);
+        } catch (Exception e) {
+            return null;
         }
-        return null;
+    }
+
+    public String extractJwtId(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            return claims.getId();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public Date extractExpiration(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            return claims.getExpiration();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public Set<User.Role> extractRoles(String token) {
-        if (token != null && token.startsWith("JWT_")) {
-            String[] parts = token.split("_");
-            if (parts.length > 4 && !parts[4].isEmpty()) {
-                String[] roleNames = parts[4].split(",");
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+                    
+            String rolesString = claims.get("roles", String.class);
+            if (rolesString != null && !rolesString.isEmpty()) {
+                String[] roleNames = rolesString.split(",");
                 return java.util.Arrays.stream(roleNames)
                     .map(roleName -> {
                         try {
@@ -86,8 +172,34 @@ public class JwtTokenService {
                     .filter(role -> role != null)
                     .collect(Collectors.toSet());
             }
+        } catch (Exception e) {
+            // Ignore parsing errors
         }
         return java.util.Collections.emptySet();
+    }
+
+    /**
+     * Add JWT to denylist for immediate logout
+     */
+    public void addTokenToDenylist(String token) {
+        String jti = extractJwtId(token);
+        Date expiration = extractExpiration(token);
+        
+        if (jti != null && expiration != null) {
+            long ttlSeconds = (expiration.getTime() - System.currentTimeMillis()) / 1000;
+            if (ttlSeconds > 0) {
+                redisSessionService.addTokenToDenylist(jti, ttlSeconds);
+                System.out.println("Added JWT ID " + jti + " to denylist with TTL " + ttlSeconds + " seconds");
+            }
+        }
+    }
+
+    /**
+     * Check if token is on denylist
+     */
+    public boolean isTokenDenylisted(String token) {
+        String jti = extractJwtId(token);
+        return jti != null && redisSessionService.isTokenDenylisted(jti);
     }
 
     public boolean hasRole(String token, User.Role role) {
@@ -139,12 +251,6 @@ public class JwtTokenService {
 
     public String getUsernameFromToken(String token) {
         return extractUsername(token);
-    }
-
-    public void blacklistToken(String token) {
-        // Simple blacklist implementation - in production use Redis
-        // For now, just log that token is blacklisted
-        System.out.println("Token blacklisted: " + token);
     }
 
     // Legacy methods for compatibility

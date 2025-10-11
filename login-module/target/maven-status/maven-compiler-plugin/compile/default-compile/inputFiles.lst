@@ -1,5 +1,6 @@
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\AuthServiceApplication.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\config\RedisConfig.java
+C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\config\RedisHealthIndicator.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\config\RestTemplateConfig.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\config\SecurityConfig.java
 C:\Users\hp\Documents\GitHub\team-5-bt-lab\login-module\src\main\java\com\nexabank\auth\controller\AdminController.java

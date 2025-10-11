@@ -1,63 +1,97 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8081/api';
+// Split services: auth on 8080, app/admin on 8081
+const AUTH_BASE_URL = 'http://localhost:8080/api';
+const APP_BASE_URL = 'http://localhost:8081/api';
 
-// Create axios instance
+// Axios for app/admin endpoints
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: APP_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    // Prevent caches from serving stale admin stats in dev and multi-tab scenarios
+    'Cache-Control': 'no-cache',
+    Pragma: 'no-cache',
+    Expires: '0',
+  },
+});
+
+// Axios for auth endpoints
+const authApiAxios = axios.create({
+  baseURL: AUTH_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache',
+    Pragma: 'no-cache',
+    Expires: '0',
   },
 });
 
 // Request interceptor to add auth token
+const attachAuthHeader = (config: any) => {
+  const token = localStorage.getItem('accessToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+};
+
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
+    return attachAuthHeader(config);
   },
   (error) => {
     return Promise.reject(error);
   }
 );
 
+authApiAxios.interceptors.request.use(
+  (config) => attachAuthHeader(config),
+  (error) => Promise.reject(error)
+);
+
 // Response interceptor to handle token refresh
+const handleResponseError = async (error: any, originalClient: typeof api | typeof authApiAxios) => {
+  const originalRequest = error.config;
+
+  if (error.response?.status === 401 && !originalRequest._retry) {
+    originalRequest._retry = true;
+
+    try {
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (refreshToken) {
+        // Always refresh via the auth service
+        const response = await authApiAxios.post('/auth/refresh', {
+          refreshToken: refreshToken,
+        });
+
+        const { accessToken, refreshToken: newRefreshToken } = response.data.data;
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('refreshToken', newRefreshToken);
+
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        return originalClient(originalRequest);
+      }
+    } catch (refreshError) {
+      // Refresh failed, clear and redirect to login module
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      window.location.href = 'http://localhost:5173?session=expired';
+      return Promise.reject(refreshError);
+    }
+  }
+
+  return Promise.reject(error);
+};
+
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+  async (error) => handleResponseError(error, api)
+);
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      try {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (refreshToken) {
-          const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-            refreshToken: refreshToken,
-          });
-
-          const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-          localStorage.setItem('accessToken', accessToken);
-          localStorage.setItem('refreshToken', newRefreshToken);
-
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-          return api(originalRequest);
-        }
-      } catch (refreshError) {
-        // Refresh failed, clear and redirect to login module
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        window.location.href = 'http://localhost:5173?session=expired';
-        return Promise.reject(refreshError);
-      }
-    }
-
-    return Promise.reject(error);
-  }
+authApiAxios.interceptors.response.use(
+  (response) => response,
+  async (error) => handleResponseError(error, authApiAxios)
 );
 
 export interface User {
@@ -131,37 +165,37 @@ export interface CreateUserRequest {
 // Auth API functions
 export const authAPI = {
   login: async (credentials: LoginRequest): Promise<ApiResponse<AuthResponse>> => {
-    const response = await api.post('/auth/login', credentials);
+    const response = await authApiAxios.post('/auth/login', credentials);
     return response.data;
   },
 
   register: async (userData: RegisterRequest): Promise<ApiResponse<AuthResponse>> => {
-    const response = await api.post('/auth/register', userData);
+    const response = await authApiAxios.post('/auth/register', userData);
     return response.data;
   },
 
   logout: async (): Promise<ApiResponse<string>> => {
-    const response = await api.post('/auth/logout');
+    const response = await authApiAxios.post('/auth/logout');
     return response.data;
   },
 
   logoutAllDevices: async (): Promise<ApiResponse<string>> => {
-    const response = await api.post('/auth/logout-all');
+    const response = await authApiAxios.post('/auth/logout-all');
     return response.data;
   },
 
   getCurrentUser: async (): Promise<ApiResponse<User>> => {
-    const response = await api.get('/auth/me');
+    const response = await authApiAxios.get('/auth/me');
     return response.data;
   },
 
   validateToken: async (): Promise<ApiResponse<string>> => {
-    const response = await api.get('/auth/validate');
+    const response = await authApiAxios.get('/auth/validate');
     return response.data;
   },
 
   refreshToken: async (refreshToken: string): Promise<ApiResponse<AuthResponse>> => {
-    const response = await api.post('/auth/refresh', { refreshToken });
+    const response = await authApiAxios.post('/auth/refresh', { refreshToken });
     return response.data;
   },
 };
@@ -199,7 +233,8 @@ export const adminAPI = {
   },
 
   getBankStats: async (): Promise<ApiResponse<any>> => {
-    const response = await api.get('/admin/stats');
+    // Add a timestamp query to avoid intermediary/proxy caching
+    const response = await api.get('/admin/stats', { params: { t: Date.now() } });
     return response.data;
   },
 

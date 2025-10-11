@@ -1,8 +1,10 @@
 package com.nexabank.customer.service;
 
 import com.nexabank.customer.dto.CustomerProofOfIdentityDto;
+import com.nexabank.customer.entity.Customer;
 import com.nexabank.customer.entity.CustomerProofOfIdentity;
 import com.nexabank.customer.repository.CustomerProofOfIdentityRepository;
+import com.nexabank.customer.repository.CustomerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,14 @@ import java.util.stream.Collectors;
 public class CustomerProofOfIdentityService {
 
     private final CustomerProofOfIdentityRepository proofOfIdentityRepository;
+    private final CustomerRepository customerRepository;
+
+    /**
+     * Simple save method for entities
+     */
+    public CustomerProofOfIdentity save(CustomerProofOfIdentity entity) {
+        return proofOfIdentityRepository.save(entity);
+    }
 
     /**
      * Create a new proof of identity
@@ -41,7 +51,7 @@ public class CustomerProofOfIdentityService {
     public List<CustomerProofOfIdentityDto> getProofOfIdentitiesByCustomerNumber(String customerNumber) {
         log.info("Fetching proof of identities for customer: {}", customerNumber);
         
-        List<CustomerProofOfIdentity> entities = proofOfIdentityRepository.findByCustomerNumber(customerNumber);
+        List<CustomerProofOfIdentity> entities = proofOfIdentityRepository.findByCustomerCustomerNumber(customerNumber);
         return entities.stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
@@ -100,7 +110,7 @@ public class CustomerProofOfIdentityService {
     public void deleteProofOfIdentitiesByCustomerNumber(String customerNumber) {
         log.info("Deleting all proof of identities for customer: {}", customerNumber);
         
-        proofOfIdentityRepository.deleteByCustomerNumber(customerNumber);
+        proofOfIdentityRepository.deleteByCustomerCustomerNumber(customerNumber);
         log.info("All proof of identities deleted for customer: {}", customerNumber);
     }
 
@@ -111,14 +121,21 @@ public class CustomerProofOfIdentityService {
     public Optional<CustomerProofOfIdentityDto> getProofOfIdentityByCustomerNumberAndType(String customerNumber, String proofType) {
         log.info("Fetching proof of identity for customer: {} and type: {}", customerNumber, proofType);
         
-        return proofOfIdentityRepository.findByCustomerNumberAndProofOfIdType(customerNumber, proofType)
+        return proofOfIdentityRepository.findByCustomerCustomerNumberAndProofOfIdType(customerNumber, proofType)
                 .map(this::convertToDto);
     }
 
     // Helper methods for conversion
     private CustomerProofOfIdentity convertToEntity(CustomerProofOfIdentityDto dto) {
         CustomerProofOfIdentity entity = new CustomerProofOfIdentity();
-        entity.setCustomerNumber(dto.getCustomerNumber());
+        
+        // Find and set the Customer relationship if customerNumber is provided
+        if (dto.getCustomerNumber() != null) {
+            Customer customer = customerRepository.findByCustomerNumber(dto.getCustomerNumber())
+                .orElseThrow(() -> new RuntimeException("Customer not found with customer number: " + dto.getCustomerNumber()));
+            entity.setCustomer(customer);
+        }
+        
         entity.setProofOfIdType(dto.getProofOfIdType());
         entity.setClassificationTypeValue(dto.getClassificationTypeValue());
         entity.setStartDate(dto.getStartDate());
@@ -130,7 +147,12 @@ public class CustomerProofOfIdentityService {
     private CustomerProofOfIdentityDto convertToDto(CustomerProofOfIdentity entity) {
         CustomerProofOfIdentityDto dto = new CustomerProofOfIdentityDto();
         dto.setId(entity.getId());
-        dto.setCustomerNumber(entity.getCustomerNumber());
+        
+        // Get customerNumber from the Customer relationship
+        if (entity.getCustomer() != null) {
+            dto.setCustomerNumber(entity.getCustomer().getCustomerNumber());
+        }
+        
         dto.setProofOfIdType(entity.getProofOfIdType());
         dto.setClassificationTypeValue(entity.getClassificationTypeValue());
         dto.setStartDate(entity.getStartDate());

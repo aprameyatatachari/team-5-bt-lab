@@ -55,6 +55,12 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onUserCreate
             userId: response.data?.userId 
           }
         }));
+        // Cross-tab notify
+        try {
+          const bc = new BroadcastChannel('nexabank-admin');
+          bc.postMessage({ type: 'user:created', userType: formData.userType, userId: response.data?.userId });
+          bc.close();
+        } catch {}
         
         onUserCreated();
         onClose();
@@ -327,6 +333,12 @@ const UserManagement: React.FC = () => {
             newStatus 
           }
         }));
+        // Cross-tab notify
+        try {
+          const bc = new BroadcastChannel('nexabank-admin');
+          bc.postMessage({ type: 'user:updated', userId, oldStatus: currentStatus, newStatus });
+          bc.close();
+        } catch {}
       }
     } catch (error) {
       console.error('Error updating user status:', error);
@@ -349,6 +361,12 @@ const UserManagement: React.FC = () => {
               userType: userToDelete?.userType 
             }
           }));
+          // Cross-tab notify
+          try {
+            const bc = new BroadcastChannel('nexabank-admin');
+            bc.postMessage({ type: 'user:deleted', userId, userType: userToDelete?.userType });
+            bc.close();
+          } catch {}
         }
       } catch (error) {
         console.error('Error deleting user:', error);

@@ -19,9 +19,6 @@ public class CustomerNameComponent {
     @Column(name = "id", updatable = false, nullable = false)
     private String id;
     
-    @Column(name = "customer_number", nullable = false)
-    private String customerNumber;
-    
     @Column(name = "name_component_type", nullable = false)
     private String nameComponentType; // References CustomerClassification
     
@@ -39,7 +36,7 @@ public class CustomerNameComponent {
     
     // Relationship with Customer
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "customer_number", insertable = false, updatable = false)
+    @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
     
     @PrePersist

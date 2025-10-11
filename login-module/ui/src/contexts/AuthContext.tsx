@@ -93,6 +93,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, []);
 
+  // Watch for localStorage changes (when redirectToDashboard clears tokens)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken && token) {
+        // Tokens were cleared, reset auth state
+        setUser(null);
+        setToken(null);
+      }
+    };
+
+    // Check immediately
+    handleStorageChange();
+
+    // Set up interval to check periodically (since same-tab localStorage changes don't fire events)
+    const interval = setInterval(handleStorageChange, 100);
+
+    return () => clearInterval(interval);
+  }, [token]);
+
   const login = async (credentials: LoginRequest) => {
     try {
       const response = await authAPI.login(credentials);

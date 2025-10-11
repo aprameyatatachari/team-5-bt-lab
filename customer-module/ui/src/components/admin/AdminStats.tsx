@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '../ui/Card';
 import { Users, CreditCard, TrendingUp, AlertTriangle, DollarSign, Activity, RefreshCw } from 'lucide-react';
 import { adminAPI } from '../../services/api';
@@ -31,6 +31,8 @@ const AdminStats: React.FC = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const intervalRef = useRef<number | null>(null);
+  const bcRef = useRef<BroadcastChannel | null>(null);
 
   const fetchStats = async () => {
     try {
@@ -50,14 +52,34 @@ const AdminStats: React.FC = () => {
 
   useEffect(() => {
     fetchStats();
-    
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchStats, 30000);
-    
-    return () => clearInterval(interval);
+
+    const startPolling = () => {
+      // Poll more frequently while visible; slow down when hidden
+      const intervalMs = document.visibilityState === 'visible' ? 10000 : 30000;
+      if (intervalRef.current) window.clearInterval(intervalRef.current);
+      intervalRef.current = window.setInterval(fetchStats, intervalMs);
+    };
+
+    // Start initial polling
+    startPolling();
+
+    // Adjust polling on tab visibility changes
+    const handleVisibility = () => {
+      // Trigger immediate refresh when the tab becomes visible
+      if (document.visibilityState === 'visible') {
+        fetchStats();
+      }
+      startPolling();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      if (intervalRef.current) window.clearInterval(intervalRef.current);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
-  // Listen for custom events to trigger refresh
+  // Listen for custom events and broadcast channel messages to trigger refresh
   useEffect(() => {
     const handleUserCreated = () => {
       console.log('User created event received, refreshing stats...');
@@ -78,17 +100,38 @@ const AdminStats: React.FC = () => {
       console.log('Account created event received, refreshing stats...');
       fetchStats();
     };
+    const handleAccountUpdated = () => {
+      console.log('Account updated event received, refreshing stats...');
+      fetchStats();
+    };
 
     window.addEventListener('userCreated', handleUserCreated);
     window.addEventListener('userUpdated', handleUserUpdated);
     window.addEventListener('userDeleted', handleUserDeleted);
-    window.addEventListener('accountCreated', handleAccountCreated);
+  window.addEventListener('accountCreated', handleAccountCreated);
+  window.addEventListener('accountUpdated', handleAccountUpdated);
+
+    // Cross-tab updates via BroadcastChannel (fallback guarded)
+    try {
+      const bc = new BroadcastChannel('nexabank-admin');
+      bcRef.current = bc;
+      bc.onmessage = (ev) => {
+        if (ev?.data?.type?.startsWith('user:') || ev?.data?.type?.startsWith('account:') || ev?.data?.type === 'stats:refresh') {
+          console.log('Broadcast message received:', ev.data);
+          fetchStats();
+        }
+      };
+    } catch (e) {
+      // BroadcastChannel not supported; ignore silently
+    }
     
     return () => {
       window.removeEventListener('userCreated', handleUserCreated);
       window.removeEventListener('userUpdated', handleUserUpdated);
       window.removeEventListener('userDeleted', handleUserDeleted);
-      window.removeEventListener('accountCreated', handleAccountCreated);
+  window.removeEventListener('accountCreated', handleAccountCreated);
+  window.removeEventListener('accountUpdated', handleAccountUpdated);
+      if (bcRef.current) bcRef.current.close();
     };
   }, []);
 

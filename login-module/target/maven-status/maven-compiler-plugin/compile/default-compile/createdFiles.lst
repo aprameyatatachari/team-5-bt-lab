@@ -5,6 +5,7 @@ com\nexabank\auth\service\DataInitializationService.class
 com\nexabank\auth\util\NetworkUtils.class
 com\nexabank\auth\config\RedisConfig.class
 com\nexabank\auth\service\UserDetailsServiceImpl.class
+com\nexabank\auth\config\RedisHealthIndicator.class
 com\nexabank\auth\entity\enums\CrudValue.class
 com\nexabank\auth\controller\AdminController.class
 com\nexabank\auth\security\JwtAuthenticationFilter.class

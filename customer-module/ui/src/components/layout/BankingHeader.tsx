@@ -16,16 +16,27 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Badge } from '../ui/Badge';
 
 const BankingHeader: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, isLoggingOut } = useAuth();
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const [showMobileMenu, setShowMobileMenu] = React.useState(false);
 
-  const handleLogout = () => {
-    logout(() => {
-      // This callback ensures navigation happens after the state is cleared
-      // Include a marker so the login app clears its own tokens as well
-      window.location.href = 'http://localhost:5173?loggedOut=1';
-    });
+  const handleLogout = async () => {
+    try {
+      // Call logout to clear state and server session
+      await logout();
+      
+      // Clear all localStorage items manually as backup
+      localStorage.clear();
+      
+      // Use replace to completely replace the current page and go to login with logout flag
+      window.location.replace('http://localhost:5173?loggedOut=1');
+      
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Clear storage and force redirect even if logout fails
+      localStorage.clear();
+      window.location.replace('http://localhost:5173?loggedOut=1');
+    }
   };
 
   const navigationItems = [
@@ -131,10 +142,11 @@ const BankingHeader: React.FC = () => {
                     </Link>
                     <button
                       onClick={handleLogout}
-                      className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                      disabled={isLoggingOut}
+                      className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <LogOut className="h-4 w-4 mr-2" />
-                      Sign Out
+                      {isLoggingOut ? 'Signing Out...' : 'Sign Out'}
                     </button>
                   </div>
                 </div>

@@ -55,6 +55,15 @@ const AccountManagement: React.FC = () => {
               : account
           )
         );
+
+  // Emit event so AdminStats can refresh immediately
+  window.dispatchEvent(new CustomEvent('accountUpdated', { detail: { accountId, status: newStatus } }));
+        // Cross-tab notify
+        try {
+          const bc = new BroadcastChannel('nexabank-admin');
+          bc.postMessage({ type: 'account:updated', accountId, status: newStatus });
+          bc.close();
+        } catch {}
       }
     } catch (error) {
       console.error('Error updating account status:', error);

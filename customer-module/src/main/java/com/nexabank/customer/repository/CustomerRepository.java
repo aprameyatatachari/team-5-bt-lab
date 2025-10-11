@@ -21,11 +21,13 @@ public interface CustomerRepository extends JpaRepository<Customer, String> {
     // Find customer by customer number
     Optional<Customer> findByCustomerNumber(String customerNumber);
     
-    // Find customer by Aadhar number
-    Optional<Customer> findByAadharNumber(String aadharNumber);
+    // Find customer by Aadhar number - using join with CustomerIdentification
+    @Query("SELECT c FROM Customer c JOIN c.identificationDocuments id WHERE id.identificationType = 'AADHAR_CARD' AND id.identificationItem = :aadharNumber")
+    Optional<Customer> findByAadharNumber(@Param("aadharNumber") String aadharNumber);
     
-    // Find customer by PAN number
-    Optional<Customer> findByPanNumber(String panNumber);
+    // Find customer by PAN number - using join with CustomerIdentification
+    @Query("SELECT c FROM Customer c JOIN c.identificationDocuments id WHERE id.identificationType = 'PAN_CARD' AND id.identificationItem = :panNumber")
+    Optional<Customer> findByPanNumber(@Param("panNumber") String panNumber);
     
     // Find customers by status
     List<Customer> findByCustomerStatus(Customer.CustomerStatus status);
@@ -45,11 +47,9 @@ public interface CustomerRepository extends JpaRepository<Customer, String> {
     // Find customers by relationship manager
     List<Customer> findByRelationshipManagerId(String relationshipManagerId);
     
-    // Search customers by name (case insensitive)
-    @Query("SELECT c FROM Customer c WHERE " +
-           "LOWER(c.firstName) LIKE LOWER(CONCAT('%', :name, '%')) OR " +
-           "LOWER(c.lastName) LIKE LOWER(CONCAT('%', :name, '%')) OR " +
-           "LOWER(CONCAT(c.firstName, ' ', c.lastName)) LIKE LOWER(CONCAT('%', :name, '%'))")
+    // Search customers by name (case insensitive) - using join with CustomerNameComponent
+    @Query("SELECT DISTINCT c FROM Customer c JOIN c.nameComponents nc WHERE " +
+           "LOWER(nc.nameValue) LIKE LOWER(CONCAT('%', :name, '%'))")
     List<Customer> findByNameContainingIgnoreCase(@Param("name") String name);
     
     // Find customers with phone number
@@ -72,9 +72,11 @@ public interface CustomerRepository extends JpaRepository<Customer, String> {
     // Check if email exists
     boolean existsByEmailId(String emailId);
     
-    // Check if Aadhar number exists
-    boolean existsByAadharNumber(String aadharNumber);
+    // Check if Aadhar number exists - using join with CustomerIdentification
+    @Query("SELECT COUNT(c) > 0 FROM Customer c JOIN c.identificationDocuments id WHERE id.identificationType = 'AADHAR_CARD' AND id.identificationItem = :aadharNumber")
+    boolean existsByAadharNumber(@Param("aadharNumber") String aadharNumber);
     
-    // Check if PAN number exists
-    boolean existsByPanNumber(String panNumber);
+    // Check if PAN number exists - using join with CustomerIdentification
+    @Query("SELECT COUNT(c) > 0 FROM Customer c JOIN c.identificationDocuments id WHERE id.identificationType = 'PAN_CARD' AND id.identificationItem = :panNumber")
+    boolean existsByPanNumber(@Param("panNumber") String panNumber);
 }

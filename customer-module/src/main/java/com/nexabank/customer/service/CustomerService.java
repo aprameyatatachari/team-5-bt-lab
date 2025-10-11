@@ -1,8 +1,10 @@
 package com.nexabank.customer.service;
 
 import com.nexabank.customer.entity.Customer;
+import com.nexabank.customer.entity.CustomerNameComponent;
 import com.nexabank.customer.entity.enums.CrudValue;
 import com.nexabank.customer.repository.CustomerRepository;
+import com.nexabank.customer.repository.CustomerNameComponentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +20,9 @@ public class CustomerService {
     
     @Autowired
     private CustomerRepository customerRepository;
+    
+    @Autowired
+    private CustomerNameComponentRepository nameComponentRepository;
     
     /**
      * Create a new customer profile
@@ -43,8 +48,6 @@ public class CustomerService {
                                                  String emailId, String phoneNumber) {
         Customer customer = new Customer();
         customer.setUserId(userId);
-        customer.setFirstName(firstName);
-        customer.setLastName(lastName);
         customer.setEmailId(emailId);
         customer.setPhoneNumber(phoneNumber);
         customer.setCustomerType(Customer.CustomerType.INDIVIDUAL);
@@ -52,7 +55,30 @@ public class CustomerService {
         customer.setKycStatus(Customer.KycStatus.PENDING);
         customer.setRiskCategory(Customer.RiskCategory.LOW);
         
-        return createCustomer(customer);
+        // Save customer first to get the ID
+        Customer savedCustomer = createCustomer(customer);
+        
+        // Create name components for the saved customer
+        if (firstName != null && !firstName.trim().isEmpty()) {
+            createNameComponent(savedCustomer, CustomerNameComponent.FIRST_NAME, firstName.trim());
+        }
+        if (lastName != null && !lastName.trim().isEmpty()) {
+            createNameComponent(savedCustomer, CustomerNameComponent.LAST_NAME, lastName.trim());
+        }
+        
+        return savedCustomer;
+    }
+    
+    /**
+     * Helper method to create name components
+     */
+    private void createNameComponent(Customer customer, String nameType, String nameValue) {
+        CustomerNameComponent nameComponent = new CustomerNameComponent();
+        nameComponent.setCustomer(customer);
+        nameComponent.setNameComponentType(nameType);
+        nameComponent.setNameValue(nameValue);
+        nameComponent.setEffectiveDate(LocalDateTime.now());
+        nameComponentRepository.save(nameComponent);
     }
     
     /**

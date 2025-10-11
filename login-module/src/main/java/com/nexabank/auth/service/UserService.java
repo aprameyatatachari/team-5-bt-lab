@@ -119,6 +119,52 @@ public class UserService {
 
         return savedUser;
     }
+    
+    /**
+     * Register user with full registration data
+     * Creates auth user + full profile in customer-module
+     */
+    @Transactional
+    public User registerUserWithProfile(com.nexabank.auth.dto.RegisterRequest registerRequest) throws UserAlreadyExistsException {
+        // Check if user already exists
+        if (userRepository.existsByEmail(registerRequest.getEmail())) {
+            throw new UserAlreadyExistsException("Email is already registered");
+        }
+
+        // Create new user with authentication data only
+        User user = new User();
+        user.setEmail(registerRequest.getEmail());
+        user.setPasswordHash(passwordEncoder.encode(registerRequest.getPassword()));
+        
+        // Set user type and default roles
+        User.UserType type;
+        try {
+            type = registerRequest.getUserType() != null ? 
+                Enum.valueOf(User.UserType.class, registerRequest.getUserType().toUpperCase()) : 
+                User.UserType.CUSTOMER;
+        } catch (IllegalArgumentException e) {
+            type = User.UserType.CUSTOMER; // Default to customer if invalid userType provided
+        }
+        user.setUserType(type);
+        user.setRoles(getDefaultRolesForUserType(type));
+        
+        user.setStatus(User.UserStatus.ACTIVE);
+        user.setFailedLoginAttempts(0);
+
+        // Save user in auth database
+        User savedUser = userRepository.save(user);
+        
+        // Create profile in customer-module with all registration data
+        boolean profileCreated = customerRegistrationService.registerCustomerProfileWithFullData(
+            savedUser, registerRequest);
+        
+        if (!profileCreated) {
+            // Log warning but don't fail registration
+            System.err.println("Warning: Failed to create profile in customer module for user: " + savedUser.getEmail());
+        }
+
+        return savedUser;
+    }
 
     private Set<User.Role> getDefaultRolesForUserType(User.UserType userType) {
         Set<User.Role> roles = new HashSet<>();

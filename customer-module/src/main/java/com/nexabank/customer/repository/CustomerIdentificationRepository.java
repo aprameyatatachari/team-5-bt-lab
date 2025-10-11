@@ -23,4 +23,8 @@ public interface CustomerIdentificationRepository extends JpaRepository<Customer
     boolean existsByIdentificationTypeAndIdentificationItem(String identificationType, String identificationItem);
     
     List<CustomerIdentification> findByIdentificationItem(String identificationItem);
+    
+    List<CustomerIdentification> findByCustomerCustomerNumber(String customerNumber);
+    
+    void deleteByCustomerCustomerNumber(String customerNumber);
 }

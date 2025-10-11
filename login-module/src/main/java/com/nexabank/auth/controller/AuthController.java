@@ -33,20 +33,27 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest, HttpServletRequest request) {
         try {
-            // Check if user is locked out
+            // STEP 1: Check if user is locked out (Bank-Style Session Control)
             if (redisSessionService.isUserLockedOut(loginRequest.getEmail())) {
                 long remainingTime = redisSessionService.getRemainingLockoutTime(loginRequest.getEmail());
                 return ResponseEntity.status(HttpStatus.LOCKED)
                     .body(ApiResponse.error("Account locked. Please try again in " + remainingTime + " seconds"));
             }
 
-            // Authenticate user with BCrypt password validation
+            // STEP 2: Authenticate user with BCrypt password validation
             User authResult = userService.authenticate(loginRequest.getEmail(), loginRequest.getPassword());
             
             if (authResult != null) {
-                // Create JWT tokens with role information
+                // STEP 3: Create JWT tokens with JTI (unique ID for denylist tracking)
                 String accessToken = jwtTokenService.generateAccessTokenForUser(authResult);
                 String refreshToken = jwtTokenService.generateRefreshTokenForUser(authResult);
+                
+                // STEP 4: Set user lockout for 10 minutes (prevents re-login unless explicitly logged out)
+                redisSessionService.setUserLockout(authResult.getEmail());
+                
+                // STEP 5: Create session in Redis for tracking
+                String jti = jwtTokenService.extractJwtId(accessToken);
+                redisSessionService.createSession(jti, authResult.getUserId());
                 
                 AuthResponse authResponse = new AuthResponse();
                 authResponse.setAccessToken(accessToken);
@@ -54,6 +61,9 @@ public class AuthController {
                 authResponse.setTokenType("Bearer");
                 authResponse.setExpiresIn(86400L); // 24 hours in seconds
                 authResponse.setUser(authResult);
+                
+                System.out.println("✅ LOGIN SUCCESS: User " + authResult.getEmail() + " logged in with JTI: " + jti);
+                System.out.println("🔒 LOCKOUT SET: User locked for 10 minutes (until explicit logout)");
                 
                 return ResponseEntity.ok(ApiResponse.success("Login successful", authResponse));
             } else {
@@ -72,14 +82,8 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest registerRequest) {
         try {
-            User user = userService.registerUser(
-                registerRequest.getEmail(),
-                registerRequest.getPassword(),
-                registerRequest.getFirstName(),
-                registerRequest.getLastName(),
-                registerRequest.getPhoneNumber(),
-                "CUSTOMER" // Default user type
-            );
+            // Use new method that creates both auth user and full profile
+            User user = userService.registerUserWithProfile(registerRequest);
             
             // Create JWT tokens for immediate login after registration
             String accessToken = jwtTokenService.generateAccessTokenForUser(user);
@@ -109,15 +113,23 @@ public class AuthController {
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 String token = authHeader.substring(7);
                 
-                // Get user email from token and clear lockout on explicit logout
+                // STEP 1: Add JWT to denylist (immediate invalidation)
+                jwtTokenService.addTokenToDenylist(token);
+                
+                // STEP 2: Get user email and clear lockout (allows immediate re-login)
                 String userEmail = jwtTokenService.getUsernameFromToken(token);
-                redisSessionService.clearUserLockout(userEmail);
+                if (userEmail != null) {
+                    redisSessionService.clearUserLockout(userEmail);
+                    System.out.println("✅ LOGOUT SUCCESS: User " + userEmail + " logged out");
+                    System.out.println("🔓 LOCKOUT CLEARED: User can login immediately");
+                }
                 
-                // Blacklist the token using Redis session service
-                jwtTokenService.blacklistToken(token);
-                
-                // Optional: Call legacy logout method if needed
-                // userService.logoutUser(token);
+                // STEP 3: Invalidate session
+                String jti = jwtTokenService.extractJwtId(token);
+                if (jti != null) {
+                    redisSessionService.invalidateSession(jti);
+                    System.out.println("🗑️ SESSION INVALIDATED: JTI " + jti + " removed");
+                }
             }
             
             return ResponseEntity.ok(ApiResponse.success("Logged out successfully"));
@@ -147,8 +159,8 @@ public class AuthController {
                     String newAccessToken = jwtTokenService.generateAccessTokenForUser(user);
                     String newRefreshToken = jwtTokenService.generateRefreshTokenForUser(user);
                     
-                    // Blacklist old refresh token and extend lockout
-                    jwtTokenService.blacklistToken(refreshRequest.getRefreshToken());
+                    // Add old refresh token to denylist and extend lockout
+                    jwtTokenService.addTokenToDenylist(refreshRequest.getRefreshToken());
                     redisSessionService.setUserLockout(user.getEmail()); // Reset 10-minute lockout
                     
                     // Update session using the refresh session method
@@ -189,6 +201,67 @@ public class AuthController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("Failed to check lockout status: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * JWT Token Validation Endpoint for Other Modules
+     * Other services call this endpoint to verify if a JWT token is valid
+     */
+    @PostMapping("/validate")
+    public ResponseEntity<?> validateToken(@RequestHeader("Authorization") String authHeader) {
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error("Missing or invalid Authorization header"));
+            }
+
+            String token = authHeader.substring(7);
+            
+            // Check if token is on denylist
+            if (jwtTokenService.isTokenDenylisted(token)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Token has been invalidated"));
+            }
+
+            // Validate token
+            if (jwtTokenService.validateToken(token)) {
+                // Extract user information from token
+                String email = jwtTokenService.extractEmail(token);
+                String userId = jwtTokenService.getUsernameFromToken(token); // This should return userId
+                
+                // Get user details
+                var userOptional = userService.findByEmail(email);
+                if (userOptional.isPresent()) {
+                    User user = userOptional.get();
+                    
+                    // Check if user is still active
+                    if (user.getStatus() != User.UserStatus.ACTIVE) {
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                            .body(ApiResponse.error("User account is inactive"));
+                    }
+                    
+                    // Return validation success with user info
+                    Map<String, Object> validationData = new HashMap<>();
+                    validationData.put("valid", true);
+                    validationData.put("userId", user.getUserId());
+                    validationData.put("email", user.getEmail());
+                    validationData.put("userType", user.getUserType());
+                    validationData.put("roles", user.getRoles());
+                    validationData.put("status", user.getStatus());
+                    
+                    return ResponseEntity.ok(ApiResponse.success("Token is valid", validationData));
+                } else {
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(ApiResponse.error("User not found"));
+                }
+            } else {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Invalid token"));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error("Token validation failed: " + e.getMessage()));
         }
     }
 }

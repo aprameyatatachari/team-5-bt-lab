@@ -30,7 +30,7 @@ public class CustomerIdentification {
     
     // Relationship with Customer
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "customer_number", nullable = false)
+    @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
     
     @Column(name = "created_at")

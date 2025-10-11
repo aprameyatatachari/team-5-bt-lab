@@ -8,6 +8,7 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isLoggingOut: boolean;
   login: (credentials: LoginRequest) => Promise<void>;
   register: (userData: RegisterRequest) => Promise<void>;
   logout: (callback?: () => void) => Promise<void>;
@@ -35,6 +36,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('accessToken'));
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Check if user is authenticated on mount
   useEffect(() => {
@@ -80,6 +82,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const newUrl = window.location.origin + window.location.pathname;
             window.history.replaceState({}, '', newUrl);
             
+            setIsLoading(false); // CRITICAL: Set loading false before return
             return; // Exit early, we have the user data
           } catch (e) {
             console.error('Failed to parse user data from URL:', e);
@@ -90,30 +93,54 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const accessToken = localStorage.getItem('accessToken');
         if (accessToken) {
           setToken(accessToken);
-          
-          // Try to decode JWT token to get role information
+
+          // Pre-populate user with basic info decoded from JWT (best-effort fallback)
+          let decodedUserData: any = null;
           try {
             const payload = JSON.parse(atob(accessToken.split('.')[1]));
-            if (payload.roles) {
-              // If we have role info in token, create enhanced user object
-              const enhancedUser = {
-                ...user,
+            if (payload) {
+              // Build minimal user from JWT claims
+              decodedUserData = {
+                userId: payload.userId || payload.sub,
+                email: payload.sub || payload.email,
+                firstName: payload.firstName || '',
+                lastName: payload.lastName || '',
+                userType: payload.userType || 'CUSTOMER',
+                status: 'ACTIVE',
+                phoneNumber: '',
                 roles: payload.roles || []
               };
-              setUser(enhancedUser as User);
             }
           } catch (jwtError) {
-            console.warn('Could not decode JWT token for roles:', jwtError);
+            console.warn('Could not decode JWT token:', jwtError);
           }
           
-          const response = await authAPI.getCurrentUser();
-          if (response.success) {
-            setUser(response.data);
-          } else {
-            // Token is invalid, clear it
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
-            setToken(null);
+          // Set the decoded user as a fallback so UI doesn't think user is logged out
+          if (decodedUserData) {
+            setUser(decodedUserData as User);
+          }
+
+          // Try to resolve the full user via auth service (enhances the fallback)
+          try {
+            const response = await authAPI.getCurrentUser();
+            if (response.success) {
+              setUser(response.data);
+            } else {
+              console.warn('getCurrentUser returned success=false; keeping decoded user from token');
+            }
+          } catch (err: any) {
+            // Only clear tokens on definitive auth failure (401 means refresh also failed)
+            const status = err?.response?.status;
+            if (status === 401) {
+              console.warn('getCurrentUser returned 401 after refresh; clearing tokens and redirecting');
+              localStorage.removeItem('accessToken');
+              localStorage.removeItem('refreshToken');
+              setToken(null);
+              setUser(null);
+            } else {
+              console.warn('getCurrentUser failed (network/server error); keeping decoded user:', err?.message || err);
+              // Keep the decoded user from JWT so the app remains usable
+            }
           }
         }
       } catch (error) {
@@ -167,13 +194,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async (callback?: () => void) => {
     console.log('Starting logout process...');
+    setIsLoggingOut(true);
     
-    // Immediately clear client state to prevent UI issues
-    setUser(null);
-    setToken(null);
-    
-    // Try to call server logout before clearing tokens (needs auth header)
     try {
+      // Try to call server logout while we still have tokens (needs auth header)
       await authAPI.logout();
       console.log('Server-side logout successful.');
     } catch (error) {
@@ -181,13 +205,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Continue with logout even if server call fails
     }
     
-    // Clear all local storage
+    // Clear all local storage and state immediately
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
+    setUser(null);
+    setToken(null);
+    setIsLoggingOut(false);
+    
     console.log('Client-side logout complete.');
 
-    // Execute the callback to trigger navigation
+    // Execute the callback immediately if provided
     if (callback) {
       callback();
     }
@@ -247,6 +275,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     token,
     isAuthenticated: !!user,
     isLoading,
+    isLoggingOut,
     login,
     register,
     logout,
