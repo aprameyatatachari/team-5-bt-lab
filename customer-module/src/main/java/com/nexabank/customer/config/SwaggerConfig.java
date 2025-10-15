@@ -30,7 +30,7 @@ public class SwaggerConfig {
                 .info(new Info()
                         .title("NexaBank Customer Module API")
                         .version("1.0.0")
-                        .description("Comprehensive API documentation for NexaBank Customer Management and Banking Services Module")
+                        .description("API documentation for NexaBank Customer Profile Management Module")
                         .contact(new Contact()
                                 .name("NexaBank Development Team")
                                 .email("dev@nexabank.com")

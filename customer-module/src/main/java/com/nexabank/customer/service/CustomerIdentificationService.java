@@ -25,11 +25,11 @@ public class CustomerIdentificationService {
     }
     
     /**
-     * Find identification documents by customer number
+     * Find identification documents by customer ID
      */
     @Transactional(readOnly = true)
-    public List<CustomerIdentification> findByCustomerCustomerNumber(String customerNumber) {
-        return identificationRepository.findByCustomerCustomerNumber(customerNumber);
+    public List<CustomerIdentification> findByCustomerCustomerId(String customerId) {
+        return identificationRepository.findByCustomerCustomerId(customerId);
     }
     
     /**
@@ -49,10 +49,10 @@ public class CustomerIdentificationService {
     }
     
     /**
-     * Delete identification documents by customer number
+     * Delete identification documents by customer ID
      */
-    public void deleteByCustomerCustomerNumber(String customerNumber) {
-        identificationRepository.deleteByCustomerCustomerNumber(customerNumber);
+    public void deleteByCustomerCustomerId(String customerId) {
+        identificationRepository.deleteByCustomerCustomerId(customerId);
     }
     
     /**

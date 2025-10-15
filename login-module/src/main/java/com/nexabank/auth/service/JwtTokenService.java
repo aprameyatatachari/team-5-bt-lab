@@ -19,10 +19,10 @@ import java.util.stream.Collectors;
 @Service
 public class JwtTokenService {
 
-    @Value("${jwt.secret:mySecretKeyThatShouldBeAtLeast32CharactersLongForSecurity}")
+    @Value("${app.jwt.secret:mySecretKeyThatShouldBeAtLeast32CharactersLongForSecurity}")
     private String jwtSecret;
 
-    @Value("${jwt.expiration:86400000}") // 24 hours in milliseconds
+    @Value("${app.jwt.expiration:86400000}") // 24 hours in milliseconds
     private long jwtExpiration;
 
     @Autowired

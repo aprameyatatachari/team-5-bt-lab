@@ -70,15 +70,6 @@ public class Customer extends AuditLoggable {
     @Column(name = "customer_status", nullable = false)
     private CustomerStatus customerStatus = CustomerStatus.ACTIVE;
     
-    @Column(name = "customer_number", unique = true)
-    private String customerNumber;
-    
-    @Column(name = "branch_code")
-    private String branchCode;
-    
-    @Column(name = "relationship_manager_id")
-    private String relationshipManagerId;
-    
     @Enumerated(EnumType.STRING)
     @Column(name = "kyc_status")
     private KycStatus kycStatus = KycStatus.PENDING;
@@ -86,36 +77,11 @@ public class Customer extends AuditLoggable {
     @Column(name = "kyc_completion_date")
     private LocalDateTime kycCompletionDate;
     
-    @Column(name = "annual_income")
-    private Double annualIncome;
-    
-    @Column(name = "occupation")
-    private String occupation;
-    
-    @Column(name = "employer_name")
-    private String employerName;
-    
-    @Enumerated(EnumType.STRING)
-    @Column(name = "risk_category")
-    private RiskCategory riskCategory = RiskCategory.LOW;
-    
-    @Column(name = "pep_status")
-    private Boolean pepStatus = false;
-    
-    @Column(name = "fatca_status")
-    private Boolean fatcaStatus = false;
-    
-    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private Set<BankAccount> bankAccounts;
-    
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Set<CustomerIdentification> identificationDocuments;
     
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Set<CustomerNameComponent> nameComponents;
-    
-    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private Set<CustomerProofOfIdentity> proofOfIdentityDocuments;
     
     // Utility methods to work with normalized data
     
@@ -125,7 +91,7 @@ public class Customer extends AuditLoggable {
     public String getFirstName() {
         if (nameComponents == null) return null;
         return nameComponents.stream()
-            .filter(nc -> CustomerNameComponent.FIRST_NAME.equals(nc.getNameComponentType()))
+            .filter(nc -> CustomerNameComponent.NameComponentType.FIRST_NAME.equals(nc.getNameComponentType()))
             .map(CustomerNameComponent::getNameValue)
             .findFirst()
             .orElse(null);
@@ -137,7 +103,7 @@ public class Customer extends AuditLoggable {
     public String getLastName() {
         if (nameComponents == null) return null;
         return nameComponents.stream()
-            .filter(nc -> CustomerNameComponent.LAST_NAME.equals(nc.getNameComponentType()))
+            .filter(nc -> CustomerNameComponent.NameComponentType.LAST_NAME.equals(nc.getNameComponentType()))
             .map(CustomerNameComponent::getNameValue)
             .findFirst()
             .orElse(null);
@@ -252,9 +218,5 @@ public class Customer extends AuditLoggable {
     
     public enum KycStatus {
         PENDING, IN_PROGRESS, COMPLETED, REJECTED, EXPIRED
-    }
-    
-    public enum RiskCategory {
-        LOW, MEDIUM, HIGH, VERY_HIGH
     }
 }

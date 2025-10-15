@@ -1,6 +1,7 @@
 package com.nexabank.auth.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.util.Map;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ApiResponse<T> {
@@ -8,6 +9,7 @@ public class ApiResponse<T> {
     private String message;
     private T data;
     private String error;
+    private Map<String, String> errors; // For validation errors
     private Long timestamp;
 
     public ApiResponse() {}
@@ -53,6 +55,14 @@ public class ApiResponse<T> {
         this.error = error;
     }
 
+    public Map<String, String> getErrors() {
+        return errors;
+    }
+
+    public void setErrors(Map<String, String> errors) {
+        this.errors = errors;
+    }
+
     public Long getTimestamp() {
         return timestamp;
     }
@@ -88,6 +98,15 @@ public class ApiResponse<T> {
         response.setSuccess(false);
         response.setMessage(message);
         response.setError(error);
+        response.setTimestamp(System.currentTimeMillis());
+        return response;
+    }
+
+    public static <T> ApiResponse<T> error(String message, Map<String, String> errors) {
+        ApiResponse<T> response = new ApiResponse<>();
+        response.setSuccess(false);
+        response.setMessage(message);
+        response.setErrors(errors);
         response.setTimestamp(System.currentTimeMillis());
         return response;
     }

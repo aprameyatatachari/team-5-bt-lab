@@ -25,18 +25,18 @@ public class CustomerNameComponentService {
     }
     
     /**
-     * Find name components by customer number
+     * Find name components by customer ID
      */
     @Transactional(readOnly = true)
-    public List<CustomerNameComponent> findByCustomerCustomerNumber(String customerNumber) {
-        return nameComponentRepository.findByCustomerCustomerNumber(customerNumber);
+    public List<CustomerNameComponent> findByCustomerCustomerId(String customerId) {
+        return nameComponentRepository.findByCustomerCustomerId(customerId);
     }
     
     /**
      * Find name components by name component type
      */
     @Transactional(readOnly = true)
-    public List<CustomerNameComponent> findByNameComponentType(String nameComponentType) {
+    public List<CustomerNameComponent> findByNameComponentType(CustomerNameComponent.NameComponentType nameComponentType) {
         return nameComponentRepository.findByNameComponentType(nameComponentType);
     }
     
@@ -49,10 +49,10 @@ public class CustomerNameComponentService {
     }
     
     /**
-     * Delete name components by customer number
+     * Delete name components by customer ID
      */
-    public void deleteByCustomerCustomerNumber(String customerNumber) {
-        nameComponentRepository.deleteByCustomerCustomerNumber(customerNumber);
+    public void deleteByCustomerCustomerId(String customerId) {
+        nameComponentRepository.deleteByCustomerCustomerId(customerId);
     }
     
     /**
