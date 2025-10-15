@@ -19,8 +19,9 @@ public class CustomerNameComponent {
     @Column(name = "id", updatable = false, nullable = false)
     private String id;
     
+    @Enumerated(EnumType.STRING)
     @Column(name = "name_component_type", nullable = false)
-    private String nameComponentType; // References CustomerClassification
+    private NameComponentType nameComponentType;
     
     @Column(name = "name_value", nullable = false)
     private String nameValue;
@@ -61,4 +62,8 @@ public class CustomerNameComponent {
     public static final String MAIDEN_NAME = "MAIDEN_NAME";
     public static final String SUFFIX = "SUFFIX";
     public static final String PREFIX = "PREFIX";
+    
+    public enum NameComponentType {
+        FIRST_NAME, MIDDLE_NAME, LAST_NAME, MAIDEN_NAME, SUFFIX, PREFIX
+    }
 }

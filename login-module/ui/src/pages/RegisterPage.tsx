@@ -10,25 +10,53 @@ import { useAuth } from '../contexts/AuthContext';
 import type { RegisterRequest } from '../services/api';
 
 const registerSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
+  email: z.string()
+    .min(1, 'Email is required')
+    .email('Please enter a valid email address')
+    .max(100, 'Email cannot exceed 100 characters'),
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+    .max(128, 'Password cannot exceed 128 characters')
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/, 
+           'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'),
   confirmPassword: z.string(),
-  firstName: z.string().min(2, 'First name must be at least 2 characters'),
-  lastName: z.string().min(2, 'Last name must be at least 2 characters'),
-  phoneNumber: z.string().regex(/^\+?[\d\s-()]+$/, 'Please enter a valid phone number'),
-  dateOfBirth: z.string().optional(),
-  address: z.string().optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
-  postalCode: z.string().optional(),
+  firstName: z.string()
+    .min(2, 'First name must be at least 2 characters')
+    .max(50, 'First name cannot exceed 50 characters')
+    .regex(/^[a-zA-Z\s'-]+$/, 'First name can only contain letters, spaces, hyphens, and apostrophes'),
+  lastName: z.string()
+    .min(2, 'Last name must be at least 2 characters')
+    .max(50, 'Last name cannot exceed 50 characters')
+    .regex(/^[a-zA-Z\s'-]+$/, 'Last name can only contain letters, spaces, hyphens, and apostrophes'),
+  phoneNumber: z.string()
+    .regex(/^[6-9]\d{9}$/, 'Phone number must be exactly 10 digits starting with 6, 7, 8, or 9'),
+  dateOfBirth: z.string()
+    .min(1, 'Date of birth is required')
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date of birth must be in YYYY-MM-DD format'),
+  address: z.string()
+    .max(200, 'Address cannot exceed 200 characters')
+    .optional()
+    .or(z.literal('')),
+  city: z.string()
+    .max(50, 'City name cannot exceed 50 characters')
+    .regex(/^[a-zA-Z\s'-]*$/, 'City can only contain letters, spaces, hyphens, and apostrophes')
+    .optional()
+    .or(z.literal('')),
+  state: z.string()
+    .max(50, 'State name cannot exceed 50 characters')
+    .regex(/^[a-zA-Z\s'-]*$/, 'State can only contain letters, spaces, hyphens, and apostrophes')
+    .optional()
+    .or(z.literal('')),
+  postalCode: z.string()
+    .regex(/^[1-9]\d{5}$/, 'Postal code must be exactly 6 digits and cannot start with 0')
+    .optional()
+    .or(z.literal('')),
   aadharNumber: z.string()
-    .regex(/^\d{12}$/, 'Aadhar number must be 12 digits')
+    .regex(/^[2-9]\d{11}$/, 'Aadhar number must be exactly 12 digits and cannot start with 0 or 1')
     .optional()
     .or(z.literal('')),
   panNumber: z.string()
-    .regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN number format')
+    .regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'PAN number must follow format: AAAAA9999A')
     .optional()
     .or(z.literal('')),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -43,11 +71,13 @@ const RegisterPage: React.FC = () => {
   const { register: registerUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const {
     register,
     handleSubmit,
     formState: { errors },
+    setError: setFormError,
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
   });
@@ -56,6 +86,7 @@ const RegisterPage: React.FC = () => {
     try {
       setIsLoading(true);
       setError(null);
+      setValidationErrors({});
       
       const { confirmPassword, ...registerData } = data;
       
@@ -67,10 +98,34 @@ const RegisterPage: React.FC = () => {
       await registerUser(customerData as RegisterRequest);
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Registration failed');
+      console.log('Registration error:', err.response?.data);
+      
+      // Check if we have validation errors from the backend
+      if (err.response?.data?.errors && typeof err.response.data.errors === 'object') {
+        const backendErrors = err.response.data.errors;
+        setValidationErrors(backendErrors);
+        
+        // Also set form errors for react-hook-form
+        Object.keys(backendErrors).forEach(field => {
+          setFormError(field as keyof RegisterFormData, {
+            type: 'server',
+            message: backendErrors[field]
+          });
+        });
+        
+        setError('Please fix the validation errors below');
+      } else {
+        // Generic error
+        setError(err.response?.data?.message || err.message || 'Registration failed');
+      }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Helper function to get error message for a field (frontend or backend)
+  const getFieldError = (fieldName: keyof RegisterFormData): string | undefined => {
+    return errors[fieldName]?.message || validationErrors[fieldName];
   };
 
   return (
@@ -103,10 +158,10 @@ const RegisterPage: React.FC = () => {
                   id="firstName"
                   placeholder="Enter your first name"
                   {...register('firstName')}
-                  className={errors.firstName ? 'border-red-500' : ''}
+                  className={getFieldError('firstName') ? 'border-red-500' : ''}
                 />
-                {errors.firstName && (
-                  <p className="text-red-500 text-sm">{errors.firstName.message}</p>
+                {getFieldError('firstName') && (
+                  <p className="text-red-500 text-sm">{getFieldError('firstName')}</p>
                 )}
               </div>
               <div className="space-y-2">
@@ -117,10 +172,10 @@ const RegisterPage: React.FC = () => {
                   id="lastName"
                   placeholder="Enter your last name"
                   {...register('lastName')}
-                  className={errors.lastName ? 'border-red-500' : ''}
+                  className={getFieldError('lastName') ? 'border-red-500' : ''}
                 />
-                {errors.lastName && (
-                  <p className="text-red-500 text-sm">{errors.lastName.message}</p>
+                {getFieldError('lastName') && (
+                  <p className="text-red-500 text-sm">{getFieldError('lastName')}</p>
                 )}
               </div>
             </div>
@@ -135,10 +190,10 @@ const RegisterPage: React.FC = () => {
                 type="email"
                 placeholder="Enter your email"
                 {...register('email')}
-                className={errors.email ? 'border-red-500' : ''}
+                className={getFieldError('email') ? 'border-red-500' : ''}
               />
-              {errors.email && (
-                <p className="text-red-500 text-sm">{errors.email.message}</p>
+              {getFieldError('email') && (
+                <p className="text-red-500 text-sm">{getFieldError('email')}</p>
               )}
             </div>
 
@@ -148,12 +203,12 @@ const RegisterPage: React.FC = () => {
               </label>
               <Input
                 id="phoneNumber"
-                placeholder="Enter your phone number"
+                placeholder="Enter 10-digit mobile number (e.g., 9876543210)"
                 {...register('phoneNumber')}
-                className={errors.phoneNumber ? 'border-red-500' : ''}
+                className={getFieldError('phoneNumber') ? 'border-red-500' : ''}
               />
-              {errors.phoneNumber && (
-                <p className="text-red-500 text-sm">{errors.phoneNumber.message}</p>
+              {getFieldError('phoneNumber') && (
+                <p className="text-red-500 text-sm">{getFieldError('phoneNumber')}</p>
               )}
             </div>
 
@@ -168,11 +223,12 @@ const RegisterPage: React.FC = () => {
                   type="password"
                   placeholder="Enter your password"
                   {...register('password')}
-                  className={errors.password ? 'border-red-500' : ''}
+                  className={getFieldError('password') ? 'border-red-500' : ''}
                 />
-                {errors.password && (
-                  <p className="text-red-500 text-sm">{errors.password.message}</p>
+                {getFieldError('password') && (
+                  <p className="text-red-500 text-sm">{getFieldError('password')}</p>
                 )}
+                <p className="text-xs text-gray-500">Must contain uppercase, lowercase, number, and special character</p>
               </div>
               <div className="space-y-2">
                 <label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">
@@ -183,10 +239,10 @@ const RegisterPage: React.FC = () => {
                   type="password"
                   placeholder="Confirm your password"
                   {...register('confirmPassword')}
-                  className={errors.confirmPassword ? 'border-red-500' : ''}
+                  className={getFieldError('confirmPassword') ? 'border-red-500' : ''}
                 />
-                {errors.confirmPassword && (
-                  <p className="text-red-500 text-sm">{errors.confirmPassword.message}</p>
+                {getFieldError('confirmPassword') && (
+                  <p className="text-red-500 text-sm">{getFieldError('confirmPassword')}</p>
                 )}
               </div>
             </div>
@@ -200,7 +256,11 @@ const RegisterPage: React.FC = () => {
                 id="address"
                 placeholder="Enter your address"
                 {...register('address')}
+                className={getFieldError('address') ? 'border-red-500' : ''}
               />
+              {getFieldError('address') && (
+                <p className="text-red-500 text-sm">{getFieldError('address')}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-4">
@@ -212,7 +272,11 @@ const RegisterPage: React.FC = () => {
                   id="city"
                   placeholder="City"
                   {...register('city')}
+                  className={getFieldError('city') ? 'border-red-500' : ''}
                 />
+                {getFieldError('city') && (
+                  <p className="text-red-500 text-sm">{getFieldError('city')}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <label htmlFor="state" className="text-sm font-medium text-gray-700">
@@ -222,7 +286,11 @@ const RegisterPage: React.FC = () => {
                   id="state"
                   placeholder="State"
                   {...register('state')}
+                  className={getFieldError('state') ? 'border-red-500' : ''}
                 />
+                {getFieldError('state') && (
+                  <p className="text-red-500 text-sm">{getFieldError('state')}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <label htmlFor="postalCode" className="text-sm font-medium text-gray-700">
@@ -230,9 +298,13 @@ const RegisterPage: React.FC = () => {
                 </label>
                 <Input
                   id="postalCode"
-                  placeholder="Postal Code"
+                  placeholder="6-digit postal code (cannot start with 0)"
                   {...register('postalCode')}
+                  className={getFieldError('postalCode') ? 'border-red-500' : ''}
                 />
+                {getFieldError('postalCode') && (
+                  <p className="text-red-500 text-sm">{getFieldError('postalCode')}</p>
+                )}
               </div>
             </div>
 
@@ -244,12 +316,12 @@ const RegisterPage: React.FC = () => {
                 </label>
                 <Input
                   id="aadharNumber"
-                  placeholder="12-digit Aadhar number"
+                  placeholder="12-digit Aadhar number (cannot start with 0 or 1)"
                   {...register('aadharNumber')}
-                  className={errors.aadharNumber ? 'border-red-500' : ''}
+                  className={getFieldError('aadharNumber') ? 'border-red-500' : ''}
                 />
-                {errors.aadharNumber && (
-                  <p className="text-red-500 text-sm">{errors.aadharNumber.message}</p>
+                {getFieldError('aadharNumber') && (
+                  <p className="text-red-500 text-sm">{getFieldError('aadharNumber')}</p>
                 )}
               </div>
               <div className="space-y-2">
@@ -258,25 +330,30 @@ const RegisterPage: React.FC = () => {
                 </label>
                 <Input
                   id="panNumber"
-                  placeholder="PAN number"
+                  placeholder="PAN number (e.g., ABCDE1234F)"
                   {...register('panNumber')}
-                  className={errors.panNumber ? 'border-red-500' : ''}
+                  className={getFieldError('panNumber') ? 'border-red-500' : ''}
                 />
-                {errors.panNumber && (
-                  <p className="text-red-500 text-sm">{errors.panNumber.message}</p>
+                {getFieldError('panNumber') && (
+                  <p className="text-red-500 text-sm">{getFieldError('panNumber')}</p>
                 )}
               </div>
             </div>
 
             <div className="space-y-2">
               <label htmlFor="dateOfBirth" className="text-sm font-medium text-gray-700">
-                Date of Birth
+                Date of Birth *
               </label>
               <Input
                 id="dateOfBirth"
                 type="date"
                 {...register('dateOfBirth')}
+                className={getFieldError('dateOfBirth') ? 'border-red-500' : ''}
               />
+              {getFieldError('dateOfBirth') && (
+                <p className="text-red-500 text-sm">{getFieldError('dateOfBirth')}</p>
+              )}
+              <p className="text-xs text-gray-500">You must be at least 18 years old to register</p>
             </div>
           </CardContent>
           

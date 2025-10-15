@@ -33,10 +33,7 @@ public class CustomerService {
         customer.setUserId(customer.getUserId()); // Use customer's userId for audit
         customer.setUuidReference(UUID.randomUUID());
         
-        // Generate customer number if not provided
-        if (customer.getCustomerNumber() == null || customer.getCustomerNumber().isEmpty()) {
-            customer.setCustomerNumber(generateCustomerNumber());
-        }
+        // Generate customer number if not provided - now using customerId
         
         return customerRepository.save(customer);
     }
@@ -53,17 +50,16 @@ public class CustomerService {
         customer.setCustomerType(Customer.CustomerType.INDIVIDUAL);
         customer.setCustomerStatus(Customer.CustomerStatus.ACTIVE);
         customer.setKycStatus(Customer.KycStatus.PENDING);
-        customer.setRiskCategory(Customer.RiskCategory.LOW);
         
         // Save customer first to get the ID
         Customer savedCustomer = createCustomer(customer);
         
         // Create name components for the saved customer
         if (firstName != null && !firstName.trim().isEmpty()) {
-            createNameComponent(savedCustomer, CustomerNameComponent.FIRST_NAME, firstName.trim());
+            createNameComponent(savedCustomer, CustomerNameComponent.NameComponentType.FIRST_NAME, firstName.trim());
         }
         if (lastName != null && !lastName.trim().isEmpty()) {
-            createNameComponent(savedCustomer, CustomerNameComponent.LAST_NAME, lastName.trim());
+            createNameComponent(savedCustomer, CustomerNameComponent.NameComponentType.LAST_NAME, lastName.trim());
         }
         
         return savedCustomer;
@@ -72,7 +68,7 @@ public class CustomerService {
     /**
      * Helper method to create name components
      */
-    private void createNameComponent(Customer customer, String nameType, String nameValue) {
+    private void createNameComponent(Customer customer, CustomerNameComponent.NameComponentType nameType, String nameValue) {
         CustomerNameComponent nameComponent = new CustomerNameComponent();
         nameComponent.setCustomer(customer);
         nameComponent.setNameComponentType(nameType);
@@ -112,14 +108,6 @@ public class CustomerService {
     @Transactional(readOnly = true)
     public Optional<Customer> findByEmail(String emailId) {
         return customerRepository.findByEmailId(emailId);
-    }
-    
-    /**
-     * Find customer by customer number
-     */
-    @Transactional(readOnly = true)
-    public Optional<Customer> findByCustomerNumber(String customerNumber) {
-        return customerRepository.findByCustomerNumber(customerNumber);
     }
     
     /**
@@ -192,19 +180,6 @@ public class CustomerService {
     }
     
     /**
-     * Update customer risk category
-     */
-    public Customer updateRiskCategory(String customerId, Customer.RiskCategory riskCategory) {
-        Optional<Customer> customerOpt = customerRepository.findById(customerId);
-        if (customerOpt.isPresent()) {
-            Customer customer = customerOpt.get();
-            customer.setRiskCategory(riskCategory);
-            return updateCustomer(customer);
-        }
-        throw new RuntimeException("Customer not found with ID: " + customerId);
-    }
-    
-    /**
      * Check if customer exists by user ID
      */
     @Transactional(readOnly = true)
@@ -241,16 +216,6 @@ public class CustomerService {
      */
     public void deleteCustomer(String customerId) {
         updateCustomerStatus(customerId, Customer.CustomerStatus.CLOSED);
-    }
-    
-    /**
-     * Generate unique customer number
-     */
-    private String generateCustomerNumber() {
-        // Generate customer number in format: CUST-YYYYMMDD-XXXXXX
-        String prefix = "CUST";
-        String timestamp = String.valueOf(System.currentTimeMillis()).substring(5); // Last 8 digits
-        return prefix + "-" + timestamp;
     }
     
     /**

@@ -1,8 +1,11 @@
 com\nexabank\auth\entity\User.class
+com\nexabank\auth\exception\GlobalExceptionHandler.class
 com\nexabank\auth\dto\RegisterRequest.class
 com\nexabank\auth\service\UserService$1.class
 com\nexabank\auth\service\DataInitializationService.class
+com\nexabank\login\config\SwaggerConfig.class
 com\nexabank\auth\util\NetworkUtils.class
+com\nexabank\auth\validation\ValidDateOfBirth.class
 com\nexabank\auth\config\RedisConfig.class
 com\nexabank\auth\service\UserDetailsServiceImpl.class
 com\nexabank\auth\config\RedisHealthIndicator.class
@@ -11,6 +14,7 @@ com\nexabank\auth\controller\AdminController.class
 com\nexabank\auth\security\JwtAuthenticationFilter.class
 com\nexabank\auth\dto\AuthResponse.class
 com\nexabank\auth\entity\User$UserType.class
+com\nexabank\auth\validation\DateOfBirthValidator.class
 com\nexabank\auth\entity\User$Role.class
 com\nexabank\auth\dto\RefreshTokenRequest.class
 com\nexabank\auth\entity\User$UserStatus.class
@@ -21,6 +25,7 @@ com\nexabank\auth\service\RedisSessionService.class
 com\nexabank\auth\config\SecurityConfig.class
 com\nexabank\auth\service\JwtTokenService.class
 com\nexabank\auth\config\RestTemplateConfig.class
+com\nexabank\auth\controller\AuthController.class
 com\nexabank\auth\exception\AuthenticationException.class
 com\nexabank\auth\AuthServiceApplication.class
 com\nexabank\auth\service\UserService.class

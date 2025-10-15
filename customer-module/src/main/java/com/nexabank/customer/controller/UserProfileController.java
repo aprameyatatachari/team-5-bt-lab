@@ -5,11 +5,9 @@ import com.nexabank.customer.dto.UserProfileResponse;
 import com.nexabank.customer.entity.Customer;
 import com.nexabank.customer.entity.CustomerIdentification;
 import com.nexabank.customer.entity.CustomerNameComponent;
-import com.nexabank.customer.entity.CustomerProofOfIdentity;
 import com.nexabank.customer.service.CustomerService;
 import com.nexabank.customer.service.CustomerIdentificationService;
 import com.nexabank.customer.service.CustomerNameComponentService;
-import com.nexabank.customer.service.CustomerProofOfIdentityService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -35,7 +33,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/profiles")
 @CrossOrigin(origins = "*")
-@Tag(name = "Customer Profile Management", description = "Complete CRUD operations for customer profiles and banking information")
+@Tag(name = "Customer Profile Management", description = "CRUD operations for customer profile information")
 @SecurityRequirement(name = "bearerAuth")
 public class UserProfileController {
     
@@ -47,9 +45,6 @@ public class UserProfileController {
     
     @Autowired
     private CustomerNameComponentService nameComponentService;
-    
-    @Autowired
-    private CustomerProofOfIdentityService proofOfIdentityService;
     
     /**
      * Create new customer profile (called by auth-module during registration)
@@ -91,9 +86,6 @@ public class UserProfileController {
             customer.setState(request.getState());
             customer.setCountry(request.getCountry());
             customer.setPostalCode(request.getPostalCode());
-            customer.setOccupation(request.getOccupation());
-            customer.setEmployerName(request.getEmployerName());
-            customer.setAnnualIncome(request.getAnnualIncome());
             
             Customer savedCustomer = customerService.createCustomer(customer);
             
@@ -102,7 +94,7 @@ public class UserProfileController {
                 if (request.getFirstName() != null) {
                     CustomerNameComponent firstName = new CustomerNameComponent();
                     firstName.setCustomer(savedCustomer);
-                    firstName.setNameComponentType(CustomerNameComponent.FIRST_NAME);
+                    firstName.setNameComponentType(CustomerNameComponent.NameComponentType.FIRST_NAME);
                     firstName.setNameValue(request.getFirstName());
                     firstName.setEffectiveDate(LocalDateTime.now());
                     nameComponentService.save(firstName);
@@ -111,7 +103,7 @@ public class UserProfileController {
                 if (request.getLastName() != null) {
                     CustomerNameComponent lastName = new CustomerNameComponent();
                     lastName.setCustomer(savedCustomer);
-                    lastName.setNameComponentType(CustomerNameComponent.LAST_NAME);
+                    lastName.setNameComponentType(CustomerNameComponent.NameComponentType.LAST_NAME);
                     lastName.setNameValue(request.getLastName());
                     lastName.setEffectiveDate(LocalDateTime.now());
                     nameComponentService.save(lastName);
@@ -120,7 +112,7 @@ public class UserProfileController {
                 if (request.getMiddleName() != null) {
                     CustomerNameComponent middleName = new CustomerNameComponent();
                     middleName.setCustomer(savedCustomer);
-                    middleName.setNameComponentType(CustomerNameComponent.MIDDLE_NAME);
+                    middleName.setNameComponentType(CustomerNameComponent.NameComponentType.MIDDLE_NAME);
                     middleName.setNameValue(request.getMiddleName());
                     middleName.setEffectiveDate(LocalDateTime.now());
                     nameComponentService.save(middleName);
@@ -146,23 +138,23 @@ public class UserProfileController {
                 identificationService.save(pan);
             }
             
-            // Create proof of identity documents
+            // Note: Passport and driving license now stored as CustomerIdentification
             if (request.getPassportNumber() != null) {
-                CustomerProofOfIdentity passport = new CustomerProofOfIdentity();
+                CustomerIdentification passport = new CustomerIdentification();
                 passport.setCustomer(savedCustomer);
-                passport.setProofOfIdType(CustomerProofOfIdentity.PASSPORT);
-                passport.setClassificationTypeValue(request.getPassportNumber());
+                passport.setIdentificationType(CustomerIdentification.PASSPORT);
+                passport.setIdentificationItem(request.getPassportNumber());
                 passport.setEffectiveDate(LocalDateTime.now());
-                proofOfIdentityService.save(passport);
+                identificationService.save(passport);
             }
             
             if (request.getDrivingLicense() != null) {
-                CustomerProofOfIdentity license = new CustomerProofOfIdentity();
+                CustomerIdentification license = new CustomerIdentification();
                 license.setCustomer(savedCustomer);
-                license.setProofOfIdType(CustomerProofOfIdentity.DRIVING_LICENSE);
-                license.setClassificationTypeValue(request.getDrivingLicense());
+                license.setIdentificationType(CustomerIdentification.DRIVING_LICENSE);
+                license.setIdentificationItem(request.getDrivingLicense());
                 license.setEffectiveDate(LocalDateTime.now());
-                proofOfIdentityService.save(license);
+                identificationService.save(license);
             }
             
             // Create response using normalized data
@@ -226,20 +218,17 @@ public class UserProfileController {
             customer.setState(request.getState());
             customer.setCountry(request.getCountry());
             customer.setPostalCode(request.getPostalCode());
-            customer.setOccupation(request.getOccupation());
-            customer.setEmployerName(request.getEmployerName());
-            customer.setAnnualIncome(request.getAnnualIncome());
             
             Customer savedCustomer = customerService.updateCustomer(customer);
             
             // Update name components
             // For simplicity, delete and recreate name components
-            nameComponentService.deleteByCustomerCustomerNumber(customer.getCustomerNumber());
+            nameComponentService.deleteByCustomerCustomerId(customer.getCustomerId());
             
             if (request.getFirstName() != null) {
                 CustomerNameComponent firstName = new CustomerNameComponent();
                 firstName.setCustomer(savedCustomer);
-                firstName.setNameComponentType(CustomerNameComponent.FIRST_NAME);
+                firstName.setNameComponentType(CustomerNameComponent.NameComponentType.FIRST_NAME);
                 firstName.setNameValue(request.getFirstName());
                 firstName.setEffectiveDate(LocalDateTime.now());
                 nameComponentService.save(firstName);
@@ -248,7 +237,7 @@ public class UserProfileController {
             if (request.getLastName() != null) {
                 CustomerNameComponent lastName = new CustomerNameComponent();
                 lastName.setCustomer(savedCustomer);
-                lastName.setNameComponentType(CustomerNameComponent.LAST_NAME);
+                lastName.setNameComponentType(CustomerNameComponent.NameComponentType.LAST_NAME);
                 lastName.setNameValue(request.getLastName());
                 lastName.setEffectiveDate(LocalDateTime.now());
                 nameComponentService.save(lastName);
@@ -303,9 +292,8 @@ public class UserProfileController {
                 .orElseThrow(() -> new RuntimeException("Customer profile not found for userId: " + userId));
             
             // Delete related records first
-            nameComponentService.deleteByCustomerCustomerNumber(customer.getCustomerNumber());
-            identificationService.deleteByCustomerCustomerNumber(customer.getCustomerNumber());
-            proofOfIdentityService.deleteProofOfIdentitiesByCustomerNumber(customer.getCustomerNumber());
+            nameComponentService.deleteByCustomerCustomerId(customer.getCustomerId());
+            identificationService.deleteByCustomerCustomerId(customer.getCustomerId());
             
             // Delete customer (soft delete)
             customerService.deleteCustomer(customer.getCustomerId());
@@ -341,7 +329,7 @@ public class UserProfileController {
         UserProfileResponse response = new UserProfileResponse();
         
         // Basic customer data
-        response.setProfileId(customer.getCustomerNumber());
+        response.setProfileId(customer.getCustomerId());
         response.setUserId(customer.getUserId());
         response.setEmail(customer.getEmailId()); // Note: using emailId field
         response.setDateOfBirth(customer.getDateOfBirth());
@@ -355,46 +343,30 @@ public class UserProfileController {
         response.setState(customer.getState());
         response.setCountry(customer.getCountry());
         response.setPostalCode(customer.getPostalCode());
-        response.setOccupation(customer.getOccupation());
-        response.setEmployerName(customer.getEmployerName());
-        response.setAnnualIncome(customer.getAnnualIncome());
         
-        // Get name from normalized table
-        List<CustomerNameComponent> nameComponents = nameComponentService.findByCustomerCustomerNumber(customer.getCustomerNumber());
+        // Get name from normalized table using customer ID
+        List<CustomerNameComponent> nameComponents = nameComponentService.findByCustomerCustomerId(customer.getCustomerId());
         for (CustomerNameComponent nameComponent : nameComponents) {
-            if (CustomerNameComponent.FIRST_NAME.equals(nameComponent.getNameComponentType())) {
+            if (CustomerNameComponent.NameComponentType.FIRST_NAME.equals(nameComponent.getNameComponentType())) {
                 response.setFirstName(nameComponent.getNameValue());
-            } else if (CustomerNameComponent.LAST_NAME.equals(nameComponent.getNameComponentType())) {
+            } else if (CustomerNameComponent.NameComponentType.LAST_NAME.equals(nameComponent.getNameComponentType())) {
                 response.setLastName(nameComponent.getNameValue());
-            } else if (CustomerNameComponent.MIDDLE_NAME.equals(nameComponent.getNameComponentType())) {
+            } else if (CustomerNameComponent.NameComponentType.MIDDLE_NAME.equals(nameComponent.getNameComponentType())) {
                 response.setMiddleName(nameComponent.getNameValue());
             }
         }
         
-        // Get identification numbers from normalized table
-        List<CustomerIdentification> identifications = identificationService.findByCustomerCustomerNumber(customer.getCustomerNumber());
+        // Get identification numbers from normalized table using customer ID
+        List<CustomerIdentification> identifications = identificationService.findByCustomerCustomerId(customer.getCustomerId());
         for (CustomerIdentification id : identifications) {
             if (CustomerIdentification.AADHAR_CARD.equals(id.getIdentificationType())) {
                 response.setAadharNumber(id.getIdentificationItem());
             } else if (CustomerIdentification.PAN_CARD.equals(id.getIdentificationType())) {
                 response.setPanNumber(id.getIdentificationItem());
-            }
-        }
-        
-        // Get proof documents from normalized table
-        List<CustomerProofOfIdentity> proofs = proofOfIdentityService.getProofOfIdentitiesByCustomerNumber(customer.getCustomerNumber())
-            .stream().map(dto -> {
-                CustomerProofOfIdentity entity = new CustomerProofOfIdentity();
-                entity.setProofOfIdType(dto.getProofOfIdType());
-                entity.setClassificationTypeValue(dto.getClassificationTypeValue());
-                return entity;
-            }).collect(Collectors.toList());
-            
-        for (CustomerProofOfIdentity proof : proofs) {
-            if (CustomerProofOfIdentity.PASSPORT.equals(proof.getProofOfIdType())) {
-                response.setPassportNumber(proof.getClassificationTypeValue());
-            } else if (CustomerProofOfIdentity.DRIVING_LICENSE.equals(proof.getProofOfIdType())) {
-                response.setDrivingLicense(proof.getClassificationTypeValue());
+            } else if (CustomerIdentification.PASSPORT.equals(id.getIdentificationType())) {
+                response.setPassportNumber(id.getIdentificationItem());
+            } else if (CustomerIdentification.DRIVING_LICENSE.equals(id.getIdentificationType())) {
+                response.setDrivingLicense(id.getIdentificationItem());
             }
         }
         

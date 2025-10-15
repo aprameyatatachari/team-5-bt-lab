@@ -18,9 +18,6 @@ public interface CustomerRepository extends JpaRepository<Customer, String> {
     // Find customer by email
     Optional<Customer> findByEmailId(String emailId);
     
-    // Find customer by customer number
-    Optional<Customer> findByCustomerNumber(String customerNumber);
-    
     // Find customer by Aadhar number - using join with CustomerIdentification
     @Query("SELECT c FROM Customer c JOIN c.identificationDocuments id WHERE id.identificationType = 'AADHAR_CARD' AND id.identificationItem = :aadharNumber")
     Optional<Customer> findByAadharNumber(@Param("aadharNumber") String aadharNumber);
@@ -37,15 +34,6 @@ public interface CustomerRepository extends JpaRepository<Customer, String> {
     
     // Find customers by KYC status
     List<Customer> findByKycStatus(Customer.KycStatus kycStatus);
-    
-    // Find customers by risk category
-    List<Customer> findByRiskCategory(Customer.RiskCategory riskCategory);
-    
-    // Find customers by branch code
-    List<Customer> findByBranchCode(String branchCode);
-    
-    // Find customers by relationship manager
-    List<Customer> findByRelationshipManagerId(String relationshipManagerId);
     
     // Search customers by name (case insensitive) - using join with CustomerNameComponent
     @Query("SELECT DISTINCT c FROM Customer c JOIN c.nameComponents nc WHERE " +

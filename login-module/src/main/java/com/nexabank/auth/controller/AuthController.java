@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
@@ -82,7 +83,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest registerRequest) {
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest registerRequest) {
         try {
             // Use new method that creates both auth user and full profile
             User user = userService.registerUserWithProfile(registerRequest);
@@ -266,4 +267,6 @@ public class AuthController {
                 .body(com.nexabank.auth.dto.ApiResponse.error("Token validation failed: " + e.getMessage()));
         }
     }
+
+
 }
