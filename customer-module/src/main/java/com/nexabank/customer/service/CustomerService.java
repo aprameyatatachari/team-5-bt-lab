@@ -2,7 +2,6 @@ package com.nexabank.customer.service;
 
 import com.nexabank.customer.entity.Customer;
 import com.nexabank.customer.entity.CustomerNameComponent;
-import com.nexabank.customer.entity.enums.CrudValue;
 import com.nexabank.customer.repository.CustomerRepository;
 import com.nexabank.customer.repository.CustomerNameComponentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
 @Transactional
@@ -24,16 +22,21 @@ public class CustomerService {
     @Autowired
     private CustomerNameComponentRepository nameComponentRepository;
     
+    @Autowired
+    private CustomerNumberGenerator customerNumberGenerator;
+    
     /**
-     * Create a new customer profile
+     * Create a new customer profile (INSERT-ONLY: Always creates new row with C operation)
      */
     public Customer createCustomer(Customer customer) {
-        // Set audit fields
-        customer.setCrudValue(CrudValue.CREATE);
-        customer.setUserId(customer.getUserId()); // Use customer's userId for audit
-        customer.setUuidReference(UUID.randomUUID());
+        // Generate customer number for first version
+        if (customer.getCustomerNumber() == null) {
+            customer.setCustomerNumber(customerNumberGenerator.generateCustomerNumber());
+        }
         
-        // Generate customer number if not provided - now using customerId
+        // Set CRUD operation to CREATE
+        customer.setCrudOperation(Customer.CrudOperation.C);
+        customer.setVersionTimestamp(LocalDateTime.now());
         
         return customerRepository.save(customer);
     }
@@ -78,12 +81,39 @@ public class CustomerService {
     }
     
     /**
-     * Update customer profile
+     * Update customer profile (INSERT-ONLY: Creates new row with U operation)
      */
-    public Customer updateCustomer(Customer customer) {
-        customer.setCrudValue(CrudValue.UPDATE);
-        customer.setUuidReference(UUID.randomUUID());
-        return customerRepository.save(customer);
+    public Customer updateCustomer(Customer existingCustomer) {
+        // Create a new row with same customer number
+        Customer updatedCustomer = new Customer();
+        
+        // Copy customer number to maintain identity
+        updatedCustomer.setCustomerNumber(existingCustomer.getCustomerNumber());
+        updatedCustomer.setUserId(existingCustomer.getUserId());
+        
+        // Copy all fields from existing customer
+        updatedCustomer.setDateOfBirth(existingCustomer.getDateOfBirth());
+        updatedCustomer.setGender(existingCustomer.getGender());
+        updatedCustomer.setNationality(existingCustomer.getNationality());
+        updatedCustomer.setPhoneNumber(existingCustomer.getPhoneNumber());
+        updatedCustomer.setAlternatePhone(existingCustomer.getAlternatePhone());
+        updatedCustomer.setEmailId(existingCustomer.getEmailId());
+        updatedCustomer.setAddressLine1(existingCustomer.getAddressLine1());
+        updatedCustomer.setAddressLine2(existingCustomer.getAddressLine2());
+        updatedCustomer.setCity(existingCustomer.getCity());
+        updatedCustomer.setState(existingCustomer.getState());
+        updatedCustomer.setCountry(existingCustomer.getCountry());
+        updatedCustomer.setPostalCode(existingCustomer.getPostalCode());
+        updatedCustomer.setCustomerType(existingCustomer.getCustomerType());
+        updatedCustomer.setCustomerStatus(existingCustomer.getCustomerStatus());
+        updatedCustomer.setKycStatus(existingCustomer.getKycStatus());
+        updatedCustomer.setKycCompletionDate(existingCustomer.getKycCompletionDate());
+        
+        // Set CRUD operation to UPDATE
+        updatedCustomer.setCrudOperation(Customer.CrudOperation.U);
+        updatedCustomer.setVersionTimestamp(LocalDateTime.now());
+        
+        return customerRepository.save(updatedCustomer);
     }
     
     /**
@@ -95,11 +125,11 @@ public class CustomerService {
     }
     
     /**
-     * Find customer by user ID (from auth module)
+     * Find customer by user ID (from auth module) - returns latest non-deleted version
      */
     @Transactional(readOnly = true)
     public Optional<Customer> findByUserId(String userId) {
-        return customerRepository.findByUserId(userId);
+        return customerRepository.findLatestByUserId(userId);
     }
     
     /**
@@ -111,11 +141,27 @@ public class CustomerService {
     }
     
     /**
-     * Get all customers
+     * Get all customers - returns latest versions only (non-deleted)
      */
     @Transactional(readOnly = true)
     public List<Customer> findAllCustomers() {
-        return customerRepository.findAll();
+        return customerRepository.findAllLatestVersions();
+    }
+    
+    /**
+     * Find all versions of a customer by customer number (for audit trail)
+     */
+    @Transactional(readOnly = true)
+    public List<Customer> findAllVersionsByCustomerNumber(String customerNumber) {
+        return customerRepository.findAllVersionsByCustomerNumber(customerNumber);
+    }
+    
+    /**
+     * Find customer by customer number - returns latest non-deleted version
+     */
+    @Transactional(readOnly = true)
+    public Optional<Customer> findByCustomerNumber(String customerNumber) {
+        return customerRepository.findLatestByCustomerNumber(customerNumber);
     }
     
     /**
@@ -180,11 +226,11 @@ public class CustomerService {
     }
     
     /**
-     * Check if customer exists by user ID
+     * Check if customer exists by user ID (not deleted)
      */
     @Transactional(readOnly = true)
     public boolean existsByUserId(String userId) {
-        return customerRepository.existsByUserId(userId);
+        return customerRepository.findLatestByUserId(userId).isPresent();
     }
     
     /**
@@ -212,10 +258,42 @@ public class CustomerService {
     }
     
     /**
-     * Delete customer (soft delete by changing status)
+     * Delete customer (INSERT-ONLY: Creates new row with D operation - soft delete)
      */
     public void deleteCustomer(String customerId) {
-        updateCustomerStatus(customerId, Customer.CustomerStatus.CLOSED);
+        Optional<Customer> customerOpt = customerRepository.findById(customerId);
+        if (customerOpt.isPresent()) {
+            Customer existingCustomer = customerOpt.get();
+            
+            // Create new row with DELETE operation
+            Customer deletedCustomer = new Customer();
+            deletedCustomer.setCustomerNumber(existingCustomer.getCustomerNumber());
+            deletedCustomer.setUserId(existingCustomer.getUserId());
+            
+            // Copy all fields
+            deletedCustomer.setDateOfBirth(existingCustomer.getDateOfBirth());
+            deletedCustomer.setGender(existingCustomer.getGender());
+            deletedCustomer.setNationality(existingCustomer.getNationality());
+            deletedCustomer.setPhoneNumber(existingCustomer.getPhoneNumber());
+            deletedCustomer.setAlternatePhone(existingCustomer.getAlternatePhone());
+            deletedCustomer.setEmailId(existingCustomer.getEmailId());
+            deletedCustomer.setAddressLine1(existingCustomer.getAddressLine1());
+            deletedCustomer.setAddressLine2(existingCustomer.getAddressLine2());
+            deletedCustomer.setCity(existingCustomer.getCity());
+            deletedCustomer.setState(existingCustomer.getState());
+            deletedCustomer.setCountry(existingCustomer.getCountry());
+            deletedCustomer.setPostalCode(existingCustomer.getPostalCode());
+            deletedCustomer.setCustomerType(existingCustomer.getCustomerType());
+            deletedCustomer.setCustomerStatus(Customer.CustomerStatus.CLOSED);
+            deletedCustomer.setKycStatus(existingCustomer.getKycStatus());
+            deletedCustomer.setKycCompletionDate(existingCustomer.getKycCompletionDate());
+            
+            // Set CRUD operation to DELETE
+            deletedCustomer.setCrudOperation(Customer.CrudOperation.D);
+            deletedCustomer.setVersionTimestamp(LocalDateTime.now());
+            
+            customerRepository.save(deletedCustomer);
+        }
     }
     
     /**

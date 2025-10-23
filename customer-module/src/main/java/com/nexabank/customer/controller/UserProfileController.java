@@ -1,6 +1,9 @@
 package com.nexabank.customer.controller;
 
 import com.nexabank.customer.dto.CreateUserProfileRequest;
+import com.nexabank.customer.dto.UpdateAddressRequest;
+import com.nexabank.customer.dto.UpdateNameRequest;
+import com.nexabank.customer.dto.UpdateIdentificationRequest;
 import com.nexabank.customer.dto.UserProfileResponse;
 import com.nexabank.customer.entity.Customer;
 import com.nexabank.customer.entity.CustomerIdentification;
@@ -406,6 +409,259 @@ public class UserProfileController {
             }
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+        }
+    }
+    
+    // ============ INSERT-ONLY UPDATE ENDPOINTS ============
+    
+    /**
+     * Update customer address (INSERT-ONLY: creates new version with U operation)
+     */
+    @PutMapping("/user/{userId}/address")
+    @Operation(
+        summary = "Update customer address",
+        description = "Updates customer address by creating a new version of the customer record (INSERT-ONLY paradigm). The original record is preserved for audit trail."
+    )
+    public ResponseEntity<?> updateAddress(
+            @PathVariable String userId,
+            @RequestBody UpdateAddressRequest request) {
+        try {
+            Customer customer = customerService.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("Customer profile not found for userId: " + userId));
+            
+            // Update address fields
+            customer.setAddressLine1(request.getAddressLine1());
+            customer.setAddressLine2(request.getAddressLine2());
+            customer.setCity(request.getCity());
+            customer.setState(request.getState());
+            customer.setCountry(request.getCountry());
+            customer.setPostalCode(request.getPostalCode());
+            
+            // This will create a new row with CrudOperation = U
+            Customer updatedCustomer = customerService.updateCustomer(customer);
+            
+            // Update address components (create new versions)
+            updateAddressComponents(updatedCustomer, request);
+            
+            UserProfileResponse response = createUserProfileResponse(updatedCustomer);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+    
+    /**
+     * Update customer name (INSERT-ONLY: creates new version with U operation)
+     */
+    @PutMapping("/user/{userId}/name")
+    @Operation(
+        summary = "Update customer name",
+        description = "Updates customer name by creating a new version of the customer record (INSERT-ONLY paradigm). The original record is preserved for audit trail."
+    )
+    public ResponseEntity<?> updateName(
+            @PathVariable String userId,
+            @RequestBody UpdateNameRequest request) {
+        try {
+            Customer customer = customerService.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("Customer profile not found for userId: " + userId));
+            
+            // This will create a new row with CrudOperation = U
+            Customer updatedCustomer = customerService.updateCustomer(customer);
+            
+            // Update name components (create new versions)
+            if (request.getFirstName() != null) {
+                CustomerNameComponent firstName = new CustomerNameComponent();
+                firstName.setCustomer(updatedCustomer);
+                firstName.setNameComponentType(CustomerNameComponent.NameComponentType.FIRST_NAME);
+                firstName.setNameValue(request.getFirstName());
+                firstName.setEffectiveDate(LocalDateTime.now());
+                nameComponentService.save(firstName);
+            }
+            
+            if (request.getMiddleName() != null) {
+                CustomerNameComponent middleName = new CustomerNameComponent();
+                middleName.setCustomer(updatedCustomer);
+                middleName.setNameComponentType(CustomerNameComponent.NameComponentType.MIDDLE_NAME);
+                middleName.setNameValue(request.getMiddleName());
+                middleName.setEffectiveDate(LocalDateTime.now());
+                nameComponentService.save(middleName);
+            }
+            
+            if (request.getLastName() != null) {
+                CustomerNameComponent lastName = new CustomerNameComponent();
+                lastName.setCustomer(updatedCustomer);
+                lastName.setNameComponentType(CustomerNameComponent.NameComponentType.LAST_NAME);
+                lastName.setNameValue(request.getLastName());
+                lastName.setEffectiveDate(LocalDateTime.now());
+                nameComponentService.save(lastName);
+            }
+            
+            UserProfileResponse response = createUserProfileResponse(updatedCustomer);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+    
+    /**
+     * Update customer identification documents (INSERT-ONLY: creates new version with U operation)
+     */
+    @PutMapping("/user/{userId}/identification")
+    @Operation(
+        summary = "Update customer identification documents",
+        description = "Updates customer identification documents by creating a new version of the customer record (INSERT-ONLY paradigm). The original record is preserved for audit trail."
+    )
+    public ResponseEntity<?> updateIdentification(
+            @PathVariable String userId,
+            @RequestBody UpdateIdentificationRequest request) {
+        try {
+            Customer customer = customerService.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("Customer profile not found for userId: " + userId));
+            
+            // This will create a new row with CrudOperation = U
+            Customer updatedCustomer = customerService.updateCustomer(customer);
+            
+            // Update identification documents (create new versions)
+            if (request.getAadharNumber() != null) {
+                CustomerIdentification aadhar = new CustomerIdentification();
+                aadhar.setCustomer(updatedCustomer);
+                aadhar.setIdentificationType(CustomerIdentification.AADHAR_CARD);
+                aadhar.setIdentificationItem(request.getAadharNumber());
+                aadhar.setEffectiveDate(LocalDateTime.now());
+                identificationService.save(aadhar);
+            }
+            
+            if (request.getPanNumber() != null) {
+                CustomerIdentification pan = new CustomerIdentification();
+                pan.setCustomer(updatedCustomer);
+                pan.setIdentificationType(CustomerIdentification.PAN_CARD);
+                pan.setIdentificationItem(request.getPanNumber());
+                pan.setEffectiveDate(LocalDateTime.now());
+                identificationService.save(pan);
+            }
+            
+            if (request.getPassportNumber() != null) {
+                CustomerIdentification passport = new CustomerIdentification();
+                passport.setCustomer(updatedCustomer);
+                passport.setIdentificationType(CustomerIdentification.PASSPORT);
+                passport.setIdentificationItem(request.getPassportNumber());
+                passport.setEffectiveDate(LocalDateTime.now());
+                identificationService.save(passport);
+            }
+            
+            if (request.getDrivingLicense() != null) {
+                CustomerIdentification license = new CustomerIdentification();
+                license.setCustomer(updatedCustomer);
+                license.setIdentificationType(CustomerIdentification.DRIVING_LICENSE);
+                license.setIdentificationItem(request.getDrivingLicense());
+                license.setEffectiveDate(LocalDateTime.now());
+                identificationService.save(license);
+            }
+            
+            UserProfileResponse response = createUserProfileResponse(updatedCustomer);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+    
+    /**
+     * Get customer audit trail (all versions)
+     */
+    @GetMapping("/user/{userId}/audit-trail")
+    @Operation(
+        summary = "Get customer audit trail",
+        description = "Returns all versions of the customer record including create, update, and delete operations for audit purposes."
+    )
+    public ResponseEntity<?> getAuditTrail(@PathVariable String userId) {
+        try {
+            // First find customer number by userId
+            Optional<String> customerNumberOpt = customerService.findByUserId(userId)
+                .map(Customer::getCustomerNumber);
+            
+            if (customerNumberOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Customer profile not found for userId: " + userId);
+            }
+            
+            List<Customer> versions = customerService.findAllVersionsByCustomerNumber(customerNumberOpt.get());
+            
+            // Map to simplified audit trail response
+            List<Object> auditTrail = versions.stream()
+                .map(v -> {
+                    return new Object() {
+                        public final String customerId = v.getCustomerId();
+                        public final String customerNumber = v.getCustomerNumber();
+                        public final String crudOperation = v.getCrudOperation().toString();
+                        public final LocalDateTime versionTimestamp = v.getVersionTimestamp();
+                        public final String email = v.getEmailId();
+                        public final String phoneNumber = v.getPhoneNumber();
+                    };
+                })
+                .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(auditTrail);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+        }
+    }
+    
+    /**
+     * Helper method to update address components
+     */
+    private void updateAddressComponents(Customer customer, UpdateAddressRequest request) {
+        if (request.getAddressLine1() != null) {
+            CustomerAddressComponent component = new CustomerAddressComponent();
+            component.setCustomer(customer);
+            component.setAddressComponentType(CustomerAddressComponent.AddressComponentType.ADDRESS_LINE_1);
+            component.setAddressValue(request.getAddressLine1());
+            component.setEffectiveDate(LocalDateTime.now());
+            addressComponentService.save(component);
+        }
+        
+        if (request.getAddressLine2() != null) {
+            CustomerAddressComponent component = new CustomerAddressComponent();
+            component.setCustomer(customer);
+            component.setAddressComponentType(CustomerAddressComponent.AddressComponentType.ADDRESS_LINE_2);
+            component.setAddressValue(request.getAddressLine2());
+            component.setEffectiveDate(LocalDateTime.now());
+            addressComponentService.save(component);
+        }
+        
+        if (request.getCity() != null) {
+            CustomerAddressComponent component = new CustomerAddressComponent();
+            component.setCustomer(customer);
+            component.setAddressComponentType(CustomerAddressComponent.AddressComponentType.CITY);
+            component.setAddressValue(request.getCity());
+            component.setEffectiveDate(LocalDateTime.now());
+            addressComponentService.save(component);
+        }
+        
+        if (request.getState() != null) {
+            CustomerAddressComponent component = new CustomerAddressComponent();
+            component.setCustomer(customer);
+            component.setAddressComponentType(CustomerAddressComponent.AddressComponentType.STATE);
+            component.setAddressValue(request.getState());
+            component.setEffectiveDate(LocalDateTime.now());
+            addressComponentService.save(component);
+        }
+        
+        if (request.getCountry() != null) {
+            CustomerAddressComponent component = new CustomerAddressComponent();
+            component.setCustomer(customer);
+            component.setAddressComponentType(CustomerAddressComponent.AddressComponentType.COUNTRY);
+            component.setAddressValue(request.getCountry());
+            component.setEffectiveDate(LocalDateTime.now());
+            addressComponentService.save(component);
+        }
+        
+        if (request.getPostalCode() != null) {
+            CustomerAddressComponent component = new CustomerAddressComponent();
+            component.setCustomer(customer);
+            component.setAddressComponentType(CustomerAddressComponent.AddressComponentType.POSTAL_CODE);
+            component.setAddressValue(request.getPostalCode());
+            component.setEffectiveDate(LocalDateTime.now());
+            addressComponentService.save(component);
         }
     }
     

@@ -67,4 +67,40 @@ public interface CustomerRepository extends JpaRepository<Customer, String> {
     // Check if PAN number exists - using join with CustomerIdentification
     @Query("SELECT COUNT(c) > 0 FROM Customer c JOIN c.identificationDocuments id WHERE id.identificationType = 'PAN_CARD' AND id.identificationItem = :panNumber")
     boolean existsByPanNumber(@Param("panNumber") String panNumber);
+    
+    // ============ INSERT-ONLY AUDIT TRAIL METHODS ============
+    
+    // Find latest version by customer number (excludes deleted records)
+    @Query("SELECT c FROM Customer c WHERE c.customerNumber = :customerNumber " +
+           "AND c.crudOperation != 'D' " +
+           "ORDER BY c.versionTimestamp DESC")
+    Optional<Customer> findLatestByCustomerNumber(@Param("customerNumber") String customerNumber);
+    
+    // Find latest version by user ID (excludes deleted records)
+    @Query("SELECT c FROM Customer c WHERE c.userId = :userId " +
+           "AND c.crudOperation != 'D' " +
+           "ORDER BY c.versionTimestamp DESC")
+    Optional<Customer> findLatestByUserId(@Param("userId") String userId);
+    
+    // Find all versions of a customer by customer number
+    @Query("SELECT c FROM Customer c WHERE c.customerNumber = :customerNumber " +
+           "ORDER BY c.versionTimestamp DESC")
+    List<Customer> findAllVersionsByCustomerNumber(@Param("customerNumber") String customerNumber);
+    
+    // Find customer number by user ID
+    @Query("SELECT c.customerNumber FROM Customer c WHERE c.userId = :userId " +
+           "ORDER BY c.versionTimestamp DESC")
+    Optional<String> findCustomerNumberByUserId(@Param("userId") String userId);
+    
+    // Check if customer exists (not deleted) by customer number
+    @Query("SELECT COUNT(c) > 0 FROM Customer c WHERE c.customerNumber = :customerNumber " +
+           "AND c.crudOperation != 'D'")
+    boolean existsByCustomerNumber(@Param("customerNumber") String customerNumber);
+    
+    // Get all active (non-deleted) customers - latest versions only
+    @Query("SELECT c FROM Customer c WHERE c.customerId IN " +
+           "(SELECT MAX(c2.customerId) FROM Customer c2 " +
+           "WHERE c2.crudOperation != 'D' " +
+           "GROUP BY c2.customerNumber)")
+    List<Customer> findAllLatestVersions();
 }

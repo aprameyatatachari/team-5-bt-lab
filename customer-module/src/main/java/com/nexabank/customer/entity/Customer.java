@@ -23,8 +23,18 @@ public class Customer extends AuditLoggable {
     @Column(name = "customer_id", updatable = false, nullable = false)
     private String customerId;
     
-    @Column(name = "user_id", nullable = false, unique = true)
+    @Column(name = "customer_number", nullable = false)
+    private String customerNumber; // Business identifier that stays same across versions
+    
+    @Column(name = "user_id", nullable = false)
     private String userId;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "crud_operation", nullable = false)
+    private CrudOperation crudOperation = CrudOperation.C;
+    
+    @Column(name = "version_timestamp", nullable = false)
+    private LocalDateTime versionTimestamp;
     
     @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
@@ -221,5 +231,11 @@ public class Customer extends AuditLoggable {
     
     public enum KycStatus {
         PENDING, IN_PROGRESS, COMPLETED, REJECTED, EXPIRED
+    }
+    
+    public enum CrudOperation {
+        C, // Create
+        U, // Update
+        D  // Delete (soft delete)
     }
 }
