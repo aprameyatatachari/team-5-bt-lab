@@ -49,7 +49,7 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authz -> authz
                 // Public endpoints - no authentication required
-                .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/public-key").permitAll()
+                .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
                 .requestMatchers("/error", "/").permitAll()
                 .requestMatchers("/health", "/actuator/**").permitAll()
                 
@@ -60,6 +60,7 @@ public class SecurityConfig {
                 
                 // Protected endpoints - authentication required
                 .requestMatchers("/api/auth/me", "/api/auth/logout", "/api/auth/logout-all").authenticated()
+                .requestMatchers("/api/auth/validate").authenticated()
                 .requestMatchers("/api/auth/refresh").permitAll() // Refresh doesn't need JWT auth
                 
                 // All other API requests require authentication
