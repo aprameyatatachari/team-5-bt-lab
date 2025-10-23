@@ -4,12 +4,20 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * DTO for returning user profile information (safe for API responses)
+ * DTO for returning customer profile information with INSERT-ONLY paradigm fields
  */
 public class UserProfileResponse {
     
-    private String profileId;
+    // INSERT-ONLY paradigm fields
+    private String customerId;          // Technical ID (changes with each version)
+    private String customerNumber;      // Business ID (same across all versions)
+    private String crudOperation;       // C, U, or D
+    private LocalDateTime versionTimestamp; // When this version was created
+    
+    // User linkage
     private String userId;
+    
+    // Personal information
     private String email;
     private String firstName;
     private String lastName;
@@ -17,35 +25,69 @@ public class UserProfileResponse {
     private LocalDate dateOfBirth;
     private String gender;
     private String nationality;
+    
+    // Contact information
     private String phoneNumber;
     private String alternatePhone;
+    
+    // Address information
     private String addressLine1;
     private String addressLine2;
     private String city;
     private String state;
     private String country;
     private String postalCode;
-    private String maskedAadhar; // Masked version for security
-    private String maskedPan;     // Masked version for security
-    private String aadharNumber;  // Full aadhar number (for backward compatibility)
-    private String panNumber;     // Full PAN number (for backward compatibility)
+    
+    // Identification documents (masked for security)
+    private String maskedAadhar;
+    private String maskedPan;
+    private String aadharNumber;        // Full number (only for authorized access)
+    private String panNumber;           // Full number (only for authorized access)
     private String passportNumber;
     private String drivingLicense;
-    private String occupation;
-    private String employerName;
-    private Double annualIncome;
-    private LocalDateTime createdAt;
+    
+    // Customer status
+    private String customerType;        // INDIVIDUAL, CORPORATE, etc.
+    private String customerStatus;      // ACTIVE, INACTIVE, CLOSED, etc.
+    private String kycStatus;           // PENDING, COMPLETED, etc.
+    private LocalDateTime kycCompletionDate;
     
     // Constructors
     public UserProfileResponse() {}
     
     // Getters and Setters
-    public String getProfileId() {
-        return profileId;
+    
+    // INSERT-ONLY paradigm fields
+    public String getCustomerId() {
+        return customerId;
     }
     
-    public void setProfileId(String profileId) {
-        this.profileId = profileId;
+    public void setCustomerId(String customerId) {
+        this.customerId = customerId;
+    }
+    
+    public String getCustomerNumber() {
+        return customerNumber;
+    }
+    
+    public void setCustomerNumber(String customerNumber) {
+        this.customerNumber = customerNumber;
+    }
+    
+    public String getCrudOperation() {
+        return crudOperation;
+    }
+    
+    public void setCrudOperation(String crudOperation) {
+        this.crudOperation = crudOperation;
+    }
+    
+    public LocalDateTime getVersionTimestamp() {
+        return versionTimestamp;
+    }
+    
+    public void setVersionTimestamp(LocalDateTime versionTimestamp) {
+        this.versionTimestamp = versionTimestamp;
     }
     
     public String getUserId() {
@@ -192,38 +234,6 @@ public class UserProfileResponse {
         this.maskedPan = maskedPan;
     }
     
-    public String getOccupation() {
-        return occupation;
-    }
-    
-    public void setOccupation(String occupation) {
-        this.occupation = occupation;
-    }
-    
-    public String getEmployerName() {
-        return employerName;
-    }
-    
-    public void setEmployerName(String employerName) {
-        this.employerName = employerName;
-    }
-    
-    public Double getAnnualIncome() {
-        return annualIncome;
-    }
-    
-    public void setAnnualIncome(Double annualIncome) {
-        this.annualIncome = annualIncome;
-    }
-    
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-    
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-    
     public String getAadharNumber() {
         return aadharNumber;
     }
@@ -254,5 +264,38 @@ public class UserProfileResponse {
     
     public void setDrivingLicense(String drivingLicense) {
         this.drivingLicense = drivingLicense;
+    }
+    
+    // Customer status fields
+    public String getCustomerType() {
+        return customerType;
+    }
+    
+    public void setCustomerType(String customerType) {
+        this.customerType = customerType;
+    }
+    
+    public String getCustomerStatus() {
+        return customerStatus;
+    }
+    
+    public void setCustomerStatus(String customerStatus) {
+        this.customerStatus = customerStatus;
+    }
+    
+    public String getKycStatus() {
+        return kycStatus;
+    }
+    
+    public void setKycStatus(String kycStatus) {
+        this.kycStatus = kycStatus;
+    }
+    
+    public LocalDateTime getKycCompletionDate() {
+        return kycCompletionDate;
+    }
+    
+    public void setKycCompletionDate(LocalDateTime kycCompletionDate) {
+        this.kycCompletionDate = kycCompletionDate;
     }
 }

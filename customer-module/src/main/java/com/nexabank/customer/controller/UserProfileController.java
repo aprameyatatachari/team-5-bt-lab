@@ -340,6 +340,33 @@ public class UserProfileController {
     }
     
     /**
+     * Get profile by customer number (for internal systems)
+     */
+    @GetMapping("/customer/{customerNumber}")
+    @Operation(
+        summary = "Get customer profile by customer number",
+        description = "Retrieves latest non-deleted customer profile using the business identifier (customer number). This is the recommended endpoint for looking up customers by their business ID."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Customer profile found", 
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserProfileResponse.class))),
+        @ApiResponse(responseCode = "404", description = "Customer profile not found", 
+                    content = @Content(mediaType = "application/json"))
+    })
+    public ResponseEntity<?> getProfileByCustomerNumber(
+        @Parameter(description = "Customer number (e.g., CUST-20251023-000001)", required = true)
+        @PathVariable String customerNumber) {
+        try {
+            Customer customer = customerService.findByCustomerNumber(customerNumber)
+                .orElseThrow(() -> new RuntimeException("Customer not found with customerNumber: " + customerNumber));
+            UserProfileResponse response = createUserProfileResponse(customer);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
+    }
+    
+    /**
      * Get all profiles (for admin modules)
      */
     @GetMapping
@@ -671,10 +698,15 @@ public class UserProfileController {
     private UserProfileResponse createUserProfileResponse(Customer customer) {
         UserProfileResponse response = new UserProfileResponse();
         
+        // INSERT-ONLY paradigm fields
+        response.setCustomerId(customer.getCustomerId());
+        response.setCustomerNumber(customer.getCustomerNumber());
+        response.setCrudOperation(customer.getCrudOperation() != null ? customer.getCrudOperation().name() : null);
+        response.setVersionTimestamp(customer.getVersionTimestamp());
+        
         // Basic customer data
-        response.setProfileId(customer.getCustomerId());
         response.setUserId(customer.getUserId());
-        response.setEmail(customer.getEmailId()); // Note: using emailId field
+        response.setEmail(customer.getEmailId());
         response.setDateOfBirth(customer.getDateOfBirth());
         response.setGender(customer.getGender());
         response.setNationality(customer.getNationality());
@@ -686,6 +718,12 @@ public class UserProfileController {
         response.setState(customer.getState());
         response.setCountry(customer.getCountry());
         response.setPostalCode(customer.getPostalCode());
+        
+        // Customer status
+        response.setCustomerType(customer.getCustomerType() != null ? customer.getCustomerType().name() : null);
+        response.setCustomerStatus(customer.getCustomerStatus() != null ? customer.getCustomerStatus().name() : null);
+        response.setKycStatus(customer.getKycStatus() != null ? customer.getKycStatus().name() : null);
+        response.setKycCompletionDate(customer.getKycCompletionDate());
         
         // Get name from normalized table using customer ID
         List<CustomerNameComponent> nameComponents = nameComponentService.findByCustomerCustomerId(customer.getCustomerId());
@@ -721,9 +759,19 @@ public class UserProfileController {
         List<CustomerIdentification> identifications = identificationService.findByCustomerCustomerId(customer.getCustomerId());
         for (CustomerIdentification id : identifications) {
             if (CustomerIdentification.AADHAR_CARD.equals(id.getIdentificationType())) {
-                response.setAadharNumber(id.getIdentificationItem());
+                String aadharNumber = id.getIdentificationItem();
+                response.setAadharNumber(aadharNumber);
+                // Set masked Aadhar
+                if (aadharNumber != null && aadharNumber.length() >= 4) {
+                    response.setMaskedAadhar("XXXX-XXXX-" + aadharNumber.substring(aadharNumber.length() - 4));
+                }
             } else if (CustomerIdentification.PAN_CARD.equals(id.getIdentificationType())) {
-                response.setPanNumber(id.getIdentificationItem());
+                String panNumber = id.getIdentificationItem();
+                response.setPanNumber(panNumber);
+                // Set masked PAN
+                if (panNumber != null && panNumber.length() >= 4) {
+                    response.setMaskedPan(panNumber.substring(0, 2) + "XXXX" + panNumber.substring(panNumber.length() - 2));
+                }
             } else if (CustomerIdentification.PASSPORT.equals(id.getIdentificationType())) {
                 response.setPassportNumber(id.getIdentificationItem());
             } else if (CustomerIdentification.DRIVING_LICENSE.equals(id.getIdentificationType())) {
