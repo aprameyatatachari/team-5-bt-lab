@@ -1,9 +1,8 @@
 package com.nexabank.customer.dto;
 
-import java.time.LocalDate;
-
 /**
  * DTO for creating a new user profile
+ * Aligned with RegisterRequest from login-module
  */
 public class CreateUserProfileRequest {
     
@@ -12,11 +11,12 @@ public class CreateUserProfileRequest {
     private String firstName;
     private String lastName;
     private String middleName;
-    private LocalDate dateOfBirth;
+    private String dateOfBirth; // Changed to String to match RegisterRequest
     private String gender;
     private String nationality = "Indian";
     private String phoneNumber;
     private String alternatePhone;
+    private String address; // Added to match RegisterRequest (maps to addressLine1)
     private String addressLine1;
     private String addressLine2;
     private String city;
@@ -75,12 +75,20 @@ public class CreateUserProfileRequest {
         this.middleName = middleName;
     }
     
-    public LocalDate getDateOfBirth() {
+    public String getDateOfBirth() {
         return dateOfBirth;
     }
     
-    public void setDateOfBirth(LocalDate dateOfBirth) {
+    public void setDateOfBirth(String dateOfBirth) {
         this.dateOfBirth = dateOfBirth;
+    }
+    
+    public String getAddress() {
+        return address;
+    }
+    
+    public void setAddress(String address) {
+        this.address = address;
     }
     
     public String getGender() {

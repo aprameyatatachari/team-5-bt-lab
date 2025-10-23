@@ -72,7 +72,9 @@ public class CustomerRegistrationService {
         try {
             String url = customerServiceUrl + "/api/profiles";
             
-            // Prepare complete profile data
+            System.out.println("🔄 Calling customer module at: " + url);
+            
+            // Prepare complete profile data matching CreateUserProfileRequest structure
             Map<String, Object> profileData = new HashMap<>();
             profileData.put("userId", user.getUserId());
             profileData.put("email", user.getEmail());
@@ -81,30 +83,34 @@ public class CustomerRegistrationService {
             profileData.put("phoneNumber", registerRequest.getPhoneNumber());
             
             // Add optional fields if provided
-            if (registerRequest.getDateOfBirth() != null) {
+            if (registerRequest.getDateOfBirth() != null && !registerRequest.getDateOfBirth().isEmpty()) {
                 profileData.put("dateOfBirth", registerRequest.getDateOfBirth());
             }
-            if (registerRequest.getAddress() != null) {
+            // Use 'address' field to match both DTOs
+            if (registerRequest.getAddress() != null && !registerRequest.getAddress().isEmpty()) {
+                profileData.put("address", registerRequest.getAddress());
                 profileData.put("addressLine1", registerRequest.getAddress());
             }
-            if (registerRequest.getCity() != null) {
+            if (registerRequest.getCity() != null && !registerRequest.getCity().isEmpty()) {
                 profileData.put("city", registerRequest.getCity());
             }
-            if (registerRequest.getState() != null) {
+            if (registerRequest.getState() != null && !registerRequest.getState().isEmpty()) {
                 profileData.put("state", registerRequest.getState());
             }
-            if (registerRequest.getCountry() != null) {
+            if (registerRequest.getCountry() != null && !registerRequest.getCountry().isEmpty()) {
                 profileData.put("country", registerRequest.getCountry());
             }
-            if (registerRequest.getPostalCode() != null) {
+            if (registerRequest.getPostalCode() != null && !registerRequest.getPostalCode().isEmpty()) {
                 profileData.put("postalCode", registerRequest.getPostalCode());
             }
-            if (registerRequest.getAadharNumber() != null) {
+            if (registerRequest.getAadharNumber() != null && !registerRequest.getAadharNumber().isEmpty()) {
                 profileData.put("aadharNumber", registerRequest.getAadharNumber());
             }
-            if (registerRequest.getPanNumber() != null) {
+            if (registerRequest.getPanNumber() != null && !registerRequest.getPanNumber().isEmpty()) {
                 profileData.put("panNumber", registerRequest.getPanNumber());
             }
+            
+            System.out.println("📦 Profile data being sent: " + profileData);
             
             // Set headers
             HttpHeaders headers = new HttpHeaders();
@@ -121,10 +127,13 @@ public class CustomerRegistrationService {
                 String.class
             );
             
+            System.out.println("✅ Customer module response status: " + response.getStatusCode());
+            System.out.println("📄 Customer module response body: " + response.getBody());
+            
             return response.getStatusCode().is2xxSuccessful();
             
         } catch (Exception e) {
-            System.err.println("Failed to create customer profile with full data: " + e.getMessage());
+            System.err.println("❌ Failed to create customer profile with full data: " + e.getMessage());
             e.printStackTrace();
             return false;
         }

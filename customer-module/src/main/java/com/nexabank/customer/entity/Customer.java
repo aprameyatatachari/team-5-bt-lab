@@ -83,6 +83,9 @@ public class Customer extends AuditLoggable {
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Set<CustomerNameComponent> nameComponents;
     
+    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private Set<CustomerAddressComponent> addressComponents;
+    
     // Utility methods to work with normalized data
     
     /**

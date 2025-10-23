@@ -5,9 +5,11 @@ import com.nexabank.customer.dto.UserProfileResponse;
 import com.nexabank.customer.entity.Customer;
 import com.nexabank.customer.entity.CustomerIdentification;
 import com.nexabank.customer.entity.CustomerNameComponent;
+import com.nexabank.customer.entity.CustomerAddressComponent;
 import com.nexabank.customer.service.CustomerService;
 import com.nexabank.customer.service.CustomerIdentificationService;
 import com.nexabank.customer.service.CustomerNameComponentService;
+import com.nexabank.customer.service.CustomerAddressComponentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -21,7 +23,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -45,6 +49,9 @@ public class UserProfileController {
     
     @Autowired
     private CustomerNameComponentService nameComponentService;
+    
+    @Autowired
+    private CustomerAddressComponentService addressComponentService;
     
     /**
      * Create new customer profile (called by auth-module during registration)
@@ -75,12 +82,24 @@ public class UserProfileController {
             Customer customer = new Customer();
             customer.setUserId(request.getUserId());
             customer.setEmailId(request.getEmail()); // Note: using emailId field
-            customer.setDateOfBirth(request.getDateOfBirth());
+            
+            // Parse date of birth from String to LocalDate
+            if (request.getDateOfBirth() != null && !request.getDateOfBirth().isEmpty()) {
+                try {
+                    customer.setDateOfBirth(LocalDate.parse(request.getDateOfBirth(), DateTimeFormatter.ISO_LOCAL_DATE));
+                } catch (Exception e) {
+                    System.err.println("Failed to parse date of birth: " + request.getDateOfBirth());
+                }
+            }
+            
             customer.setGender(request.getGender());
             customer.setNationality(request.getNationality());
             customer.setPhoneNumber(request.getPhoneNumber());
             customer.setAlternatePhone(request.getAlternatePhone());
-            customer.setAddressLine1(request.getAddressLine1());
+            
+            // Handle both 'address' and 'addressLine1' fields for compatibility
+            String primaryAddress = request.getAddressLine1() != null ? request.getAddressLine1() : request.getAddress();
+            customer.setAddressLine1(primaryAddress);
             customer.setAddressLine2(request.getAddressLine2());
             customer.setCity(request.getCity());
             customer.setState(request.getState());
@@ -157,6 +176,61 @@ public class UserProfileController {
                 identificationService.save(license);
             }
             
+            // Create address components
+            if (primaryAddress != null) {
+                CustomerAddressComponent addressLine1Component = new CustomerAddressComponent();
+                addressLine1Component.setCustomer(savedCustomer);
+                addressLine1Component.setAddressComponentType(CustomerAddressComponent.AddressComponentType.ADDRESS_LINE_1);
+                addressLine1Component.setAddressValue(primaryAddress);
+                addressLine1Component.setEffectiveDate(LocalDateTime.now());
+                addressComponentService.save(addressLine1Component);
+            }
+            
+            if (request.getAddressLine2() != null) {
+                CustomerAddressComponent addressLine2Component = new CustomerAddressComponent();
+                addressLine2Component.setCustomer(savedCustomer);
+                addressLine2Component.setAddressComponentType(CustomerAddressComponent.AddressComponentType.ADDRESS_LINE_2);
+                addressLine2Component.setAddressValue(request.getAddressLine2());
+                addressLine2Component.setEffectiveDate(LocalDateTime.now());
+                addressComponentService.save(addressLine2Component);
+            }
+            
+            if (request.getCity() != null) {
+                CustomerAddressComponent cityComponent = new CustomerAddressComponent();
+                cityComponent.setCustomer(savedCustomer);
+                cityComponent.setAddressComponentType(CustomerAddressComponent.AddressComponentType.CITY);
+                cityComponent.setAddressValue(request.getCity());
+                cityComponent.setEffectiveDate(LocalDateTime.now());
+                addressComponentService.save(cityComponent);
+            }
+            
+            if (request.getState() != null) {
+                CustomerAddressComponent stateComponent = new CustomerAddressComponent();
+                stateComponent.setCustomer(savedCustomer);
+                stateComponent.setAddressComponentType(CustomerAddressComponent.AddressComponentType.STATE);
+                stateComponent.setAddressValue(request.getState());
+                stateComponent.setEffectiveDate(LocalDateTime.now());
+                addressComponentService.save(stateComponent);
+            }
+            
+            if (request.getCountry() != null) {
+                CustomerAddressComponent countryComponent = new CustomerAddressComponent();
+                countryComponent.setCustomer(savedCustomer);
+                countryComponent.setAddressComponentType(CustomerAddressComponent.AddressComponentType.COUNTRY);
+                countryComponent.setAddressValue(request.getCountry());
+                countryComponent.setEffectiveDate(LocalDateTime.now());
+                addressComponentService.save(countryComponent);
+            }
+            
+            if (request.getPostalCode() != null) {
+                CustomerAddressComponent postalCodeComponent = new CustomerAddressComponent();
+                postalCodeComponent.setCustomer(savedCustomer);
+                postalCodeComponent.setAddressComponentType(CustomerAddressComponent.AddressComponentType.POSTAL_CODE);
+                postalCodeComponent.setAddressValue(request.getPostalCode());
+                postalCodeComponent.setEffectiveDate(LocalDateTime.now());
+                addressComponentService.save(postalCodeComponent);
+            }
+            
             // Create response using normalized data
             UserProfileResponse response = createUserProfileResponse(savedCustomer);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -207,12 +281,24 @@ public class UserProfileController {
             
             // Update customer fields
             customer.setEmailId(request.getEmail());
-            customer.setDateOfBirth(request.getDateOfBirth());
+            
+            // Parse date of birth from String to LocalDate
+            if (request.getDateOfBirth() != null && !request.getDateOfBirth().isEmpty()) {
+                try {
+                    customer.setDateOfBirth(LocalDate.parse(request.getDateOfBirth(), DateTimeFormatter.ISO_LOCAL_DATE));
+                } catch (Exception e) {
+                    System.err.println("Failed to parse date of birth: " + request.getDateOfBirth());
+                }
+            }
+            
             customer.setGender(request.getGender());
             customer.setNationality(request.getNationality());
             customer.setPhoneNumber(request.getPhoneNumber());
             customer.setAlternatePhone(request.getAlternatePhone());
-            customer.setAddressLine1(request.getAddressLine1());
+            
+            // Handle both 'address' and 'addressLine1' fields for compatibility
+            String primaryAddress = request.getAddressLine1() != null ? request.getAddressLine1() : request.getAddress();
+            customer.setAddressLine1(primaryAddress);
             customer.setAddressLine2(request.getAddressLine2());
             customer.setCity(request.getCity());
             customer.setState(request.getState());
@@ -294,6 +380,7 @@ public class UserProfileController {
             // Delete related records first
             nameComponentService.deleteByCustomerCustomerId(customer.getCustomerId());
             identificationService.deleteByCustomerCustomerId(customer.getCustomerId());
+            addressComponentService.deleteByCustomerCustomerId(customer.getCustomerId());
             
             // Delete customer (soft delete)
             customerService.deleteCustomer(customer.getCustomerId());
@@ -353,6 +440,24 @@ public class UserProfileController {
                 response.setLastName(nameComponent.getNameValue());
             } else if (CustomerNameComponent.NameComponentType.MIDDLE_NAME.equals(nameComponent.getNameComponentType())) {
                 response.setMiddleName(nameComponent.getNameValue());
+            }
+        }
+        
+        // Get address from normalized table using customer ID
+        List<CustomerAddressComponent> addressComponents = addressComponentService.findByCustomerCustomerId(customer.getCustomerId());
+        for (CustomerAddressComponent addressComponent : addressComponents) {
+            if (CustomerAddressComponent.AddressComponentType.ADDRESS_LINE_1.equals(addressComponent.getAddressComponentType())) {
+                response.setAddressLine1(addressComponent.getAddressValue());
+            } else if (CustomerAddressComponent.AddressComponentType.ADDRESS_LINE_2.equals(addressComponent.getAddressComponentType())) {
+                response.setAddressLine2(addressComponent.getAddressValue());
+            } else if (CustomerAddressComponent.AddressComponentType.CITY.equals(addressComponent.getAddressComponentType())) {
+                response.setCity(addressComponent.getAddressValue());
+            } else if (CustomerAddressComponent.AddressComponentType.STATE.equals(addressComponent.getAddressComponentType())) {
+                response.setState(addressComponent.getAddressValue());
+            } else if (CustomerAddressComponent.AddressComponentType.COUNTRY.equals(addressComponent.getAddressComponentType())) {
+                response.setCountry(addressComponent.getAddressValue());
+            } else if (CustomerAddressComponent.AddressComponentType.POSTAL_CODE.equals(addressComponent.getAddressComponentType())) {
+                response.setPostalCode(addressComponent.getAddressValue());
             }
         }
         
