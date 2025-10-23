@@ -1,5 +1,6 @@
 package com.nexabank.auth.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.nexabank.auth.entity.enums.CrudValue;
 import jakarta.persistence.*;
 import java.sql.Timestamp;
@@ -11,6 +12,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 // Use @MappedSuperclass to avoid creating a table for this abstract class
 @MappedSuperclass
+@JsonIgnoreProperties(value = {"crudValue", "auditUserId", "wsId", "prgmId", "hostTs", "localTs", "acptTs", "acptTsUtcOfst", "uuidReference"}, allowGetters = false)
 public abstract class AuditLoggable {
 
     @CreationTimestamp

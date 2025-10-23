@@ -53,6 +53,11 @@ public class SecurityConfig {
                 .requestMatchers("/error", "/").permitAll()
                 .requestMatchers("/health", "/actuator/**").permitAll()
                 
+                // Swagger/OpenAPI endpoints
+                .requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll()
+                .requestMatchers("/v3/api-docs/**", "/api-docs/**").permitAll()
+                .requestMatchers("/swagger-resources/**", "/webjars/**").permitAll()
+                
                 // Protected endpoints - authentication required
                 .requestMatchers("/api/auth/me", "/api/auth/logout", "/api/auth/logout-all").authenticated()
                 .requestMatchers("/api/auth/validate").authenticated()
