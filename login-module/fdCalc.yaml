@@ -1,0 +1,790 @@
+openapi: 3.0.1
+info:
+  title: NEXA Bank - Fixed Deposit Calculator API
+  description: |
+    ## Overview
+    The FD Calculator API provides comprehensive fixed deposit calculation services for NEXA Bank customers.
+
+    ## Key Features
+    - **Cumulative FD**: Calculate maturity value with compound interest
+    - **Non-Cumulative FD**: Calculate periodic payouts with configurable frequency
+    - **Dynamic Interest Rates**: Real-time rate fetching from Product & Pricing API
+    - **Category Benefits**: Support for senior citizens, gold/silver/platinum customers, and employees
+    - **Multiple Compounding Options**: Daily, Monthly, Quarterly, and Yearly compounding
+    - **APY Calculation**: Accurate Annual Percentage Yield with compounding
+
+    ## Calculation Types
+
+    ### Cumulative FD
+    Interest is compounded and reinvested. Customer receives the full amount at maturity.
+    - **Formula**: A = P(1 + r/n)^(nt)
+    - **Returns**: maturity_value, maturity_date, apy, effective_rate
+
+    ### Non-Cumulative FD
+    Interest is paid out periodically (monthly/quarterly/yearly). Principal remains constant.
+    - **Formula**: Payout = P Ã— [(1 + r/m)^n - 1]
+    - **Returns**: payout_freq, payout_amount, maturity_value (principal), apy, effective_rate
+
+    ## Interest Rate Structure
+    Base interest rates are tenure-based:
+    - **0-12 months**: INT12M001
+    - **12-24 months**: INT24M001
+    - **24-36 months**: INT36M001
+    - **36+ months**: INT60M001
+
+    ## Category Benefits
+    Additional interest rates based on customer categories:
+    - **SENIOR**: Senior Citizen (0.75% extra)
+    - **JR**: Junior Citizen (0.50% extra)
+    - **GOLD**: Gold Customer (0.25% extra)
+    - **SILVER**: Silver Customer (0.15% extra)
+    - **PLAT**: Platinum Customer (0.35% extra)
+    - **EMP**: Employee (1.00% extra)
+    - **DY**: Divyang (1.25% extra)
+
+    ## Product Rules Validation
+    Each FD is validated against product-specific rules:
+    - Minimum amount (MIN001)
+    - Maximum amount (MAX001)
+    - Maximum interest rate (MAXINT001)
+
+    ## Example Use Cases
+
+    ### Example 1: Senior Citizen - Cumulative FD
+    ```json
+    {
+      "principal_amount": 100000,
+      "tenure_value": 5,
+      "tenure_unit": "YEARS",
+      "interest_type": "COMPOUND",
+      "compounding_frequency": "QUARTERLY",
+      "category1_id": "SENIOR",
+      "cumulative": true,
+      "product_code": "FD001"
+    }
+    ```
+
+    ### Example 2: Gold Customer - Non-Cumulative with Yearly Payout
+    ```json
+    {
+      "principal_amount": 50000,
+      "tenure_value": 3,
+      "tenure_unit": "YEARS",
+      "interest_type": "COMPOUND",
+      "compounding_frequency": "QUARTERLY",
+      "category1_id": "GOLD",
+      "cumulative": false,
+      "payout_freq": "YEARLY",
+      "product_code": "FD001"
+    }
+    ```
+
+    ## Response Codes
+    - **200**: Successful calculation
+    - **400**: Invalid request parameters
+    - **500**: Server error (e.g., Product API unavailable)
+
+    ## Rate Caching
+    Interest rates are cached and refreshed periodically to ensure optimal performance.
+    Cache refresh can be triggered via the admin endpoint.
+
+    ## Integration
+    This API integrates with:
+    - **Product & Pricing API** (port 8080): For product rules and interest rates
+    - **MySQL Database**: For calculation history and rate caching
+  termsOfService: https://www.nexabank.com/terms
+  contact:
+    name: NEXA Bank API Support
+    url: https://www.nexabank.com
+    email: support@nexabank.com
+  license:
+    name: Proprietary
+    url: https://www.nexabank.com/license
+  version: 1.0.0
+servers:
+  - url: http://localhost:8081
+    description: Development Server
+  - url: https://api.nexabank.com
+    description: Production Server
+tags:
+  - name: Admin
+    description: Administrative endpoints for product rule synchronization and category management
+  - name: Reference Data
+    description: Reference data endpoints for categories, currencies, compounding options, and rate cache management
+  - name: FD Calculator
+    description: Fixed Deposit calculation endpoints for both cumulative and non-cumulative FDs
+paths:
+  /api/fd/rate-cache/refresh:
+    post:
+      tags:
+        - Reference Data
+      summary: Refresh rate cache
+      description: |
+        Manually refresh the cached interest rates for a specific product code.
+
+        **Purpose:**
+        - Interest rates are cached for performance
+        - This endpoint forces a refresh from Product & Pricing API
+        - Use when rates are updated in the pricing system
+
+        **Process:**
+        1. Calls Product & Pricing API
+        2. Fetches latest base rate for the product
+        3. Updates cache in database
+        4. Returns confirmation message
+
+        **When to Use:**
+        - After rate changes in Product & Pricing API
+        - When cache seems stale
+        - For testing with new rates
+
+        **Note:** Automatic refresh happens periodically via scheduler
+      operationId: refresh
+      parameters:
+        - name: productCode
+          in: query
+          description: Product code to refresh rates for (e.g., FD001)
+          required: true
+          schema:
+            type: string
+          example: FD001
+      responses:
+        '200':
+          description: Cache refreshed successfully
+          content:
+            text/plain:
+              examples:
+                Success Message:
+                  description: Success Message
+                  value: Refreshed FD001
+        '500':
+          description: Failed to refresh cache (Product API unavailable)
+          content:
+            text/plain: {}
+  /api/fd/calculate:
+    post:
+      tags:
+        - FD Calculator
+      summary: Calculate Fixed Deposit returns
+      description: |
+        Calculate Fixed Deposit maturity value, interest, and APY based on provided parameters.
+
+        **Supports two FD types:**
+
+        1. **Cumulative FD** (cumulative=true):
+           - Interest is compounded and reinvested
+           - Returns maturity_value with accumulated interest
+           - Customer receives full amount at maturity
+
+        2. **Non-Cumulative FD** (cumulative=false):
+           - Interest is paid out periodically
+           - Returns payout_freq and payout_amount
+           - Principal remains constant
+
+        **Interest Rate Calculation:**
+        - Base rate fetched from Product & Pricing API based on tenure
+        - Additional rates applied based on customer categories
+        - Effective rate = Base rate + Category benefits
+        - APY calculated based on compounding frequency
+
+        **Example Scenarios:**
+
+        **Senior Citizen - Cumulative:**
+        - Principal: â‚¹1,00,000
+        - Tenure: 5 years
+        - Category: SENIOR (+0.75%)
+        - Compounding: Quarterly
+        - Result: Higher maturity value due to compounding
+
+        **Gold Customer - Non-Cumulative:**
+        - Principal: â‚¹50,000
+        - Tenure: 3 years
+        - Category: GOLD (+0.25%)
+        - Payout: Quarterly
+        - Result: Quarterly interest payments
+      operationId: calculate
+      requestBody:
+        description: FD calculation parameters
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FDCalculationRequest'
+            examples:
+              Cumulative FD - Senior Citizen:
+                summary: Senior citizen cumulative FD with quarterly compounding
+                description: Cumulative FD - Senior Citizen
+                value:
+                  principal_amount: 100000
+                  tenure_value: 5
+                  tenure_unit: YEARS
+                  interest_type: COMPOUND
+                  compounding_frequency: QUARTERLY
+                  currency_code: INR
+                  category1_id: SENIOR
+                  category2_id: GOLD
+                  cumulative: true
+                  product_code: FD001
+              Non-Cumulative FD - Gold Customer:
+                summary: Gold customer non-cumulative FD with yearly payouts
+                description: Non-Cumulative FD - Gold Customer
+                value:
+                  principal_amount: 50000
+                  tenure_value: 3
+                  tenure_unit: YEARS
+                  interest_type: COMPOUND
+                  compounding_frequency: QUARTERLY
+                  currency_code: INR
+                  category1_id: GOLD
+                  cumulative: false
+                  payout_freq: YEARLY
+                  product_code: FD001
+              Employee FD - Monthly Payout:
+                summary: Employee non-cumulative FD with monthly interest payout
+                description: Employee FD - Monthly Payout
+                value:
+                  principal_amount: 200000
+                  tenure_value: 2
+                  tenure_unit: YEARS
+                  interest_type: COMPOUND
+                  compounding_frequency: MONTHLY
+                  currency_code: INR
+                  category1_id: EMP
+                  cumulative: false
+                  payout_freq: MONTHLY
+                  product_code: FD001
+        required: true
+      responses:
+        '200':
+          description: Calculation successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FDCalculationResponse'
+              examples:
+                Cumulative FD Result:
+                  summary: Result for cumulative FD
+                  description: Cumulative FD Result
+                  value:
+                    maturity_value: 164361.5
+                    maturity_date: '2030-10-10'
+                    apy: 10.6508
+                    effective_rate: 10.25
+                    payout_freq: null
+                    payout_amount: null
+                    calc_id: 123
+                    result_id: 123
+                Non-Cumulative FD Result:
+                  summary: Result for non-cumulative FD with payouts
+                  description: Non-Cumulative FD Result
+                  value:
+                    maturity_value: 50000
+                    maturity_date: '2028-10-10'
+                    apy: 10.6508
+                    effective_rate: 10.25
+                    payout_freq: YEARLY
+                    payout_amount: 5325.38
+                    calc_id: 124
+                    result_id: 124
+        '400':
+          description: Invalid request parameters (validation failed)
+          content:
+            application/json: {}
+        '500':
+          description: Server error (e.g., Product & Pricing API unavailable)
+          content:
+            application/json: {}
+  /api/admin/sync-product-rules/{productCode}:
+    post:
+      tags:
+        - Admin
+      summary: Sync product rules from Product & Pricing API
+      description: "Synchronize product rules (categories and their benefits) from the Product & Pricing API to the local database.\n\n**Purpose:**\n- Fetch latest category definitions from Product & Pricing API\n- Store them in local Category repository for faster access\n- Ensure consistency between pricing system and FD calculator\n\n**Process:**\n1. Calls Product & Pricing API's `/api/rules?product_code={productCode}` endpoint\n2. Retrieves all product rules (MIN001, MAX001, SR001, JR001, GOLD, etc.)\n3. Parses rule codes and extracts category information\n4. Updates or creates Category records in local database\n5. Returns success/failure status\n\n**Rule Naming Convention:**\n- **SR001, JR001, DY001**: Customer category rules\n- Last 3 digits are parsed to create category codes\n- Rule value becomes the benefit rate\n\n**When to Use:**\n- Initial system setup\n- After changes in Product & Pricing API\n- When new categories are added\n- Periodic refresh (e.g., daily via scheduler)\n\n**Example Rules:**\n- SR001 â†’ SENIOR category with 0.75% benefit\n- GOLD001 â†’ GOLD category with 0.25% benefit\n- EMP001 â†’ EMP category with 1.00% benefit\n\n**âš ï¸\x8F Admin Only:** This endpoint should be restricted to admin users in production\n"
+      operationId: syncProductRules
+      parameters:
+        - name: productCode
+          in: path
+          description: Product code to sync rules for (e.g., FD001, FD002)
+          required: true
+          schema:
+            type: string
+          example: FD001
+      responses:
+        '200':
+          description: Sync completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+              examples:
+                Success Response:
+                  description: Success Response
+                  value:
+                    status: success
+                    message: Successfully synced product rules for FD001
+        '500':
+          description: Sync failed (Product API unavailable or parsing error)
+          content:
+            application/json:
+              schema:
+                type: object
+              examples:
+                Error Response:
+                  description: Error Response
+                  value:
+                    status: error
+                    message: 'Failed to sync product rules: Connection refused'
+  /api/fd/rate-cache/{productCode}:
+    get:
+      tags:
+        - Reference Data
+      summary: Get cached base rate
+      description: |
+        Retrieve the currently cached base interest rate for a product.
+
+        **Purpose:**
+        - View current cached rate without recalculating
+        - Check if cache is populated
+        - Debugging rate-related issues
+
+        **Returns:**
+        - Base interest rate (before category benefits)
+        - Null if product not found in cache
+
+        **Note:**
+        - This is the base rate only
+        - Actual customer rate = base rate + category benefits
+        - Use /calculate endpoint for full rate calculation
+
+        **Example:**
+        - Cached base rate: 7.5%
+        - Customer category: SENIOR (+0.75%)
+        - Effective rate: 8.25%
+      operationId: getRate
+      parameters:
+        - name: productCode
+          in: path
+          description: Product code to get rate for
+          required: true
+          schema:
+            type: string
+          example: FD001
+      responses:
+        '200':
+          description: Base rate retrieved (or null if not cached)
+          content:
+            application/json:
+              schema:
+                type: number
+                format: decimal
+              examples:
+                Rate Found:
+                  description: Rate Found
+                  value: 7.5
+                Rate Not Found:
+                  description: Rate Not Found
+                  value: null
+  /api/fd/history:
+    get:
+      tags:
+        - FD Calculator
+      summary: Get calculation history
+      description: |
+        Get a list of all calculation IDs in the system.
+
+        **Use Case:**
+        - View all past calculations
+        - Audit trail for FD calculations
+        - Customer calculation history
+
+        **Returns:**
+        List of calculation IDs that can be used with the /calculations/{calcId} endpoint to retrieve full details.
+
+        **Note:** This endpoint returns only the IDs. Use the individual get endpoint to retrieve full calculation details.
+      operationId: history
+      responses:
+        '200':
+          description: List of calculation IDs
+          content:
+            application/json:
+              examples:
+                Calculation IDs:
+                  description: Calculation IDs
+                  value:
+                    - 101
+                    - 102
+                    - 103
+                    - 104
+                    - 105
+  /api/fd/currencies:
+    get:
+      tags:
+        - Reference Data
+      summary: Get supported currencies
+      description: |
+        Retrieve list of supported currency codes for FD calculations.
+
+        **Currently Supported:**
+        - **INR**: Indian Rupee
+        - **JPY**: Japanese Yen
+        - **AED**: UAE Dirham
+
+        **Use Case:**
+        - Populate currency dropdown in UI
+        - Validate currency input
+        - Multi-currency FD support
+      operationId: currencies
+      responses:
+        '200':
+          description: List of currency codes
+          content:
+            application/json:
+              examples:
+                Currency Codes:
+                  description: Currency Codes
+                  value:
+                    - INR
+                    - JPY
+                    - AED
+  /api/fd/compounding-options:
+    get:
+      tags:
+        - Reference Data
+      summary: Get compounding frequency options
+      description: |
+        Retrieve available compounding frequency options for compound interest calculations.
+
+        **Options:**
+        - **DAILY**: Interest compounded 365 times per year (highest APY)
+        - **MONTHLY**: Interest compounded 12 times per year
+        - **QUARTERLY**: Interest compounded 4 times per year (most common)
+        - **YEARLY**: Interest compounded once per year (lowest APY)
+
+        **Impact on APY:**
+        More frequent compounding = Higher APY
+
+        **Example:**
+        For 10% annual rate:
+        - Daily: APY â‰ˆ 10.52%
+        - Monthly: APY â‰ˆ 10.47%
+        - Quarterly: APY â‰ˆ 10.38%
+        - Yearly: APY = 10.00%
+
+        **Use Case:**
+        - Populate compounding frequency dropdown
+        - Show available options to customers
+        - Calculate APY based on frequency
+      operationId: compounding
+      responses:
+        '200':
+          description: List of compounding frequencies
+          content:
+            application/json:
+              examples:
+                Compounding Options:
+                  description: Compounding Options
+                  value:
+                    - DAILY
+                    - MONTHLY
+                    - QUARTERLY
+                    - YEARLY
+  /api/fd/categories:
+    get:
+      tags:
+        - Reference Data
+      summary: Get all customer categories
+      description: |
+        Retrieve all available customer categories and their benefit rates.
+
+        **Categories include:**
+        - **SENIOR**: Senior Citizen - Additional 0.75% interest
+        - **JR**: Junior Citizen - Additional 0.50% interest
+        - **GOLD**: Gold Customer - Additional 0.25% interest
+        - **SILVER**: Silver Customer - Additional 0.15% interest
+        - **PLAT**: Platinum Customer - Additional 0.35% interest
+        - **EMP**: Employee - Additional 1.00% interest
+        - **DY**: Divyang (Differently-abled) - Additional 1.25% interest
+
+        **Use Case:**
+        - Populate dropdown for customer category selection
+        - Display available benefits to customers
+        - Calculate total interest rate with category benefits
+
+        **Note:** Categories can be combined (category1_id + category2_id) for cumulative benefits
+      operationId: categories
+      responses:
+        '200':
+          description: List of categories retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryDTO'
+              examples:
+                Categories List:
+                  description: Categories List
+                  value:
+                    - categoryId: 1
+                      categoryCode: SENIOR
+                      categoryName: Senior Citizen
+                      benefitRate: 0.75
+                      description: Senior citizens aged 60 and above
+                    - categoryId: 2
+                      categoryCode: GOLD
+                      categoryName: Gold Customer
+                      benefitRate: 0.25
+                      description: Premium banking customers
+  /api/fd/calculations/{calcId}:
+    get:
+      tags:
+        - FD Calculator
+      summary: Get calculation by ID
+      description: |
+        Retrieve a previously calculated FD result using its calculation ID.
+
+        **Use Case:**
+        - Review past calculations
+        - Compare different FD scenarios
+        - Retrieve customer's FD calculation history
+
+        **Response includes:**
+        - All calculation inputs (principal, tenure, categories)
+        - Calculated results (maturity value, APY, effective rate)
+        - Payout details for non-cumulative FDs
+      operationId: getOne
+      parameters:
+        - name: calcId
+          in: path
+          description: Unique calculation ID returned from the calculate endpoint
+          required: true
+          schema:
+            type: integer
+            format: int64
+          example: 123
+      responses:
+        '200':
+          description: Calculation found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FDCalculationResponse'
+        '404':
+          description: Calculation not found
+          content:
+            application/json: {}
+  /api/admin/categories:
+    get:
+      tags:
+        - Admin
+      summary: Get all categories from database
+      description: "Retrieve all customer categories currently stored in the local database.\n\n**Purpose:**\n- View all synced categories\n- Verify sync operation results\n- Check category configurations\n- Admin dashboard display\n\n**Returns:**\nComplete list of categories with:\n- Category ID (database primary key)\n- Category Code (e.g., SENIOR, GOLD)\n- Category Name (display name)\n- Benefit Rate (additional interest percentage)\n- Description (category details)\n\n**Use Cases:**\n- Admin verification after sync\n- Category configuration review\n- Debugging category-related issues\n- Audit trail\n\n**Difference from /api/fd/categories:**\n- This endpoint: Database records (admin view)\n- /api/fd/categories: Public API (customer view)\n\n**âš ï¸\x8F Admin Only:** This endpoint should be restricted to admin users in production\n"
+      operationId: getAllCategories
+      responses:
+        '200':
+          description: Categories retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryDTO'
+              examples:
+                Categories List:
+                  description: Categories List
+                  value:
+                    - categoryId: 1
+                      categoryCode: SENIOR
+                      categoryName: Senior Citizen
+                      benefitRate: 0.75
+                      description: Senior citizens aged 60 and above - Additional 0.75% interest
+                    - categoryId: 2
+                      categoryCode: JR
+                      categoryName: Junior Citizen
+                      benefitRate: 0.5
+                      description: Minors below 18 years - Additional 0.50% interest
+                    - categoryId: 3
+                      categoryCode: GOLD
+                      categoryName: Gold Customer
+                      benefitRate: 0.25
+                      description: Premium banking customers - Additional 0.25% interest
+                    - categoryId: 4
+                      categoryCode: EMP
+                      categoryName: Employee
+                      benefitRate: 1
+                      description: Bank employees - Additional 1.00% interest
+components:
+  schemas:
+    FDCalculationRequest:
+      required:
+        - interest_type
+        - principal_amount
+        - product_code
+        - tenure_unit
+        - tenure_value
+      type: object
+      properties:
+        currency_code:
+          pattern: INR|JPY|AED
+          type: string
+          description: Currency code for the deposit
+          example: INR
+          default: INR
+          enum:
+            - INR
+            - JPY
+            - AED
+        principal_amount:
+          minimum: 0.01
+          exclusiveMinimum: false
+          type: number
+          description: Principal amount to be deposited
+          example: 100000
+        tenure_value:
+          minimum: 1
+          type: integer
+          description: Tenure value (numeric part of the tenure period)
+          format: int32
+          example: 5
+        tenure_unit:
+          pattern: DAYS|MONTHS|YEARS
+          type: string
+          description: Tenure unit (time period unit)
+          example: YEARS
+          enum:
+            - DAYS
+            - MONTHS
+            - YEARS
+        interest_type:
+          pattern: SIMPLE|COMPOUND
+          type: string
+          description: Type of interest calculation. SIMPLE = Simple interest (rarely used), COMPOUND = Compound interest (most common)
+          example: COMPOUND
+          enum:
+            - SIMPLE
+            - COMPOUND
+        compounding_frequency:
+          type: string
+          description: 'Frequency of compounding. Required for COMPOUND interest type. Options: DAILY (365 times/year), MONTHLY (12 times/year), QUARTERLY (4 times/year), YEARLY (1 time/year)'
+          example: QUARTERLY
+          enum:
+            - DAILY
+            - MONTHLY
+            - QUARTERLY
+            - YEARLY
+        category1_id:
+          type: string
+          description: Primary customer category code for additional benefits. SENIOR=Senior Citizen (+0.75%), JR=Junior (+0.50%), GOLD=Gold Customer (+0.25%), SILVER=Silver (+0.15%), PLAT=Platinum (+0.35%), EMP=Employee (+1.00%), DY=Divyang (+1.25%)
+          example: SENIOR
+          enum:
+            - SENIOR
+            - JR
+            - GOLD
+            - SILVER
+            - PLAT
+            - EMP
+            - DY
+            - MIN
+            - MAX
+            - MAXINT
+        category2_id:
+          type: string
+          description: Secondary customer category code for additional benefits (can stack with category1)
+          example: GOLD
+          enum:
+            - SENIOR
+            - JR
+            - GOLD
+            - SILVER
+            - PLAT
+            - EMP
+            - DY
+            - MIN
+            - MAX
+            - MAXINT
+        cumulative:
+          type: boolean
+          description: 'FD type: true = Cumulative FD (interest reinvested, paid at maturity), false = Non-Cumulative FD (interest paid periodically)'
+          example: true
+          default: true
+        payout_freq:
+          pattern: MONTHLY|QUARTERLY|YEARLY
+          type: string
+          description: Payout frequency for non-cumulative FDs. Required when cumulative=false. Ignored when cumulative=true. MONTHLY=12 times/year, QUARTERLY=4 times/year, YEARLY=1 time/year
+          example: QUARTERLY
+          enum:
+            - MONTHLY
+            - QUARTERLY
+            - YEARLY
+        product_code:
+          type: string
+          description: Product code for the FD scheme. Used to fetch product-specific rules and base interest rates
+          example: FD001
+      description: Fixed Deposit calculation request containing all parameters needed for FD calculation
+    FDCalculationResponse:
+      required:
+        - apy
+        - calc_id
+        - effective_rate
+        - maturity_date
+        - maturity_value
+        - result_id
+      type: object
+      properties:
+        maturity_value:
+          type: number
+          description: 'Maturity value at the end of tenure. For cumulative FD: Principal + accumulated interest. For non-cumulative FD: Same as principal (since interest is paid out periodically)'
+          example: 164361.5
+        maturity_date:
+          type: string
+          description: Maturity date in ISO format (YYYY-MM-DD)
+          example: '2030-10-10'
+        apy:
+          type: number
+          description: Annual Percentage Yield (APY) - The actual annual rate of return accounting for compounding. APY = (1 + r/n)^n - 1, where n = compounding periods per year. For example, 10.25% quarterly compounded = 10.65% APY
+          example: 10.6508
+        effective_rate:
+          type: number
+          description: Effective interest rate after applying all category benefits. This is the nominal annual rate (base rate + category bonuses), not accounting for compounding
+          example: 10.25
+        payout_freq:
+          type: string
+          description: Payout frequency for non-cumulative FDs. Null for cumulative FDs. MONTHLY = Interest paid 12 times/year, QUARTERLY = 4 times/year, YEARLY = 1 time/year
+          nullable: true
+          example: QUARTERLY
+          enum:
+            - MONTHLY
+            - QUARTERLY
+            - YEARLY
+        payout_amount:
+          type: number
+          description: 'Interest amount paid per payout period for non-cumulative FDs. Null for cumulative FDs. Calculated using compound interest formula: P Ã— [(1 + r/m)^n - 1], where m = compounding periods per year, n = compounding periods per payout'
+          nullable: true
+          example: 5325.38
+        calc_id:
+          type: integer
+          description: Unique calculation ID for retrieving this calculation later
+          format: int64
+          example: 123
+        result_id:
+          type: integer
+          description: Unique result ID for the calculation result record
+          format: int64
+          example: 123
+      description: Fixed Deposit calculation result with maturity details, interest rates, and periodic payout information
+    CategoryDTO:
+      required:
+        - additional_percentage
+        - category_id
+        - category_name
+      type: object
+      properties:
+        category_id:
+          type: integer
+          description: Unique identifier for the category
+          format: int64
+          example: 1
+        category_name:
+          type: string
+          description: Display name of the category
+          example: Senior Citizen
+        additional_percentage:
+          type: number
+          description: Additional interest percentage benefit for this category (in percentage points)
+          example: 0.75
+      description: Customer category information with benefit rates

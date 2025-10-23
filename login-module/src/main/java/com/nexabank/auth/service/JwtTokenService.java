@@ -3,15 +3,17 @@ package com.nexabank.auth.service;
 import com.nexabank.auth.entity.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
+import java.math.BigInteger;
+import java.security.*;
+import java.security.interfaces.RSAPublicKey;
+import java.util.Base64;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -19,23 +21,82 @@ import java.util.stream.Collectors;
 @Service
 public class JwtTokenService {
 
-    @Value("${app.jwt.secret:mySecretKeyThatShouldBeAtLeast32CharactersLongForSecurity}")
-    private String jwtSecret;
-
     @Value("${app.jwt.expiration:86400000}") // 24 hours in milliseconds
     private long jwtExpiration;
 
     @Autowired
     private RedisSessionService redisSessionService;
 
-    private SecretKey getSigningKey() {
-        // Ensure secret is at least 32 characters for security
-        String secret = jwtSecret;
-        if (secret.length() < 32) {
-            secret = secret + "padding".repeat((32 - secret.length()) / 7 + 1);
-            secret = secret.substring(0, 32);
+    private PrivateKey privateKey;
+    private PublicKey publicKey;
+
+    @PostConstruct
+    public void init() {
+        try {
+            // Generate RSA key pair on startup
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+            keyPairGenerator.initialize(2048);
+            KeyPair keyPair = keyPairGenerator.generateKeyPair();
+            
+            this.privateKey = keyPair.getPrivate();
+            this.publicKey = keyPair.getPublic();
+            
+            System.out.println("✅ RSA Key Pair generated successfully for JWT signing");
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("Failed to generate RSA key pair", e);
         }
-        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Get the public key in Base64 format for token verification
+     * Used by other microservices to verify JWT tokens independently
+     */
+    public String getPublicKeyBase64() {
+        return Base64.getEncoder().encodeToString(publicKey.getEncoded());
+    }
+
+    /**
+     * Get the PublicKey object
+     */
+    public PublicKey getPublicKey() {
+        return publicKey;
+    }
+
+    /**
+     * Get the public key in JWK (JSON Web Key) format
+     * Returns a map containing the JWK fields according to RFC 7517
+     */
+    public Map<String, Object> getPublicKeyJWK() {
+        if (!(publicKey instanceof RSAPublicKey)) {
+            throw new IllegalStateException("Public key is not an RSA key");
+        }
+        
+        RSAPublicKey rsaPublicKey = (RSAPublicKey) publicKey;
+        Map<String, Object> jwk = new HashMap<>();
+        
+        // Key Type
+        jwk.put("kty", "RSA");
+        
+        // Algorithm
+        jwk.put("alg", "RS256");
+        
+        // Use (signature)
+        jwk.put("use", "sig");
+        
+        // Key ID (optional, can be used to identify the key)
+        jwk.put("kid", "nexabank-auth-key-1");
+        
+        // Modulus (n) - Base64URL encoded
+        byte[] modulusBytes = rsaPublicKey.getModulus().toByteArray();
+        String modulus = Base64.getUrlEncoder().withoutPadding().encodeToString(modulusBytes);
+        jwk.put("n", modulus);
+        
+        // Exponent (e) - Base64URL encoded
+        byte[] exponentBytes = rsaPublicKey.getPublicExponent().toByteArray();
+        String exponent = Base64.getUrlEncoder().withoutPadding().encodeToString(exponentBytes);
+        jwk.put("e", exponent);
+        
+        return jwk;
     }
 
     public String generateToken(String email, String userId, String userType, Set<User.Role> roles) {
@@ -55,7 +116,7 @@ public class JwtTokenService {
                 .claim("roles", rolesString)
                 .issuedAt(now)
                 .expiration(expiration)
-                .signWith(getSigningKey())
+                .signWith(privateKey)
                 .compact();
     }
 
@@ -66,7 +127,7 @@ public class JwtTokenService {
     public boolean validateToken(String token) {
         try {
             Claims claims = Jwts.parser()
-                    .verifyWith(getSigningKey())
+                    .verifyWith(publicKey)
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
@@ -88,7 +149,7 @@ public class JwtTokenService {
     public String extractUsername(String token) {
         try {
             Claims claims = Jwts.parser()
-                    .verifyWith(getSigningKey())
+                    .verifyWith(publicKey)
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
@@ -101,7 +162,7 @@ public class JwtTokenService {
     public String extractUserId(String token) {
         try {
             Claims claims = Jwts.parser()
-                    .verifyWith(getSigningKey())
+                    .verifyWith(publicKey)
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
@@ -114,7 +175,7 @@ public class JwtTokenService {
     public String extractUserType(String token) {
         try {
             Claims claims = Jwts.parser()
-                    .verifyWith(getSigningKey())
+                    .verifyWith(publicKey)
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
@@ -127,7 +188,7 @@ public class JwtTokenService {
     public String extractJwtId(String token) {
         try {
             Claims claims = Jwts.parser()
-                    .verifyWith(getSigningKey())
+                    .verifyWith(publicKey)
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
@@ -140,7 +201,7 @@ public class JwtTokenService {
     public Date extractExpiration(String token) {
         try {
             Claims claims = Jwts.parser()
-                    .verifyWith(getSigningKey())
+                    .verifyWith(publicKey)
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
@@ -153,7 +214,7 @@ public class JwtTokenService {
     public Set<User.Role> extractRoles(String token) {
         try {
             Claims claims = Jwts.parser()
-                    .verifyWith(getSigningKey())
+                    .verifyWith(publicKey)
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
