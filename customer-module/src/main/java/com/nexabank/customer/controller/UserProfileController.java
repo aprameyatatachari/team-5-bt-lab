@@ -26,6 +26,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -55,6 +56,39 @@ public class UserProfileController {
     
     @Autowired
     private CustomerAddressComponentService addressComponentService;
+    
+    /**
+     * Authorization helper method
+     * Checks if the requesting user (from JWT) can access the requested userId's data
+     * 
+     * @param request HttpServletRequest containing userId and userType from JWT filter
+     * @param targetUserId The userId being accessed in the API endpoint
+     * @return true if access is allowed (admin or own data), false otherwise
+     */
+    private boolean isAuthorized(HttpServletRequest request, String targetUserId) {
+        String userType = (String) request.getAttribute("userType");
+        String requestingUserId = (String) request.getAttribute("userId");
+        
+        // Admins can access all data
+        if ("ADMIN".equals(userType)) {
+            return true;
+        }
+        
+        // Customers can only access their own data
+        if ("CUSTOMER".equals(userType) && requestingUserId != null && requestingUserId.equals(targetUserId)) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Check if user is admin (used for admin-only endpoints like getAll, search, delete)
+     */
+    private boolean isAdmin(HttpServletRequest request) {
+        String userType = (String) request.getAttribute("userType");
+        return "ADMIN".equals(userType);
+    }
     
     /**
      * Create new customer profile (called by auth-module during registration)
@@ -253,6 +287,8 @@ public class UserProfileController {
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Customer profile found", 
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserProfileResponse.class))),
+        @ApiResponse(responseCode = "403", description = "Access denied - insufficient permissions", 
+                    content = @Content(mediaType = "application/json")),
         @ApiResponse(responseCode = "404", description = "Customer profile not found", 
                     content = @Content(mediaType = "application/json")),
         @ApiResponse(responseCode = "500", description = "Internal server error", 
@@ -260,8 +296,15 @@ public class UserProfileController {
     })
     public ResponseEntity<?> getProfileByUserId(
         @Parameter(description = "User ID from authentication module", required = true, example = "user123")
-        @PathVariable String userId) {
+        @PathVariable String userId,
+        HttpServletRequest request) {
         try {
+            // Authorization check: customers can only access their own data, admins can access all
+            if (!isAuthorized(request, userId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Access denied: You can only access your own profile");
+            }
+            
             Customer customer = customerService.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Customer profile not found for userId: " + userId));
             UserProfileResponse response = createUserProfileResponse(customer);
@@ -277,8 +320,15 @@ public class UserProfileController {
     @PutMapping("/user/{userId}")
     public ResponseEntity<?> updateProfileByUserId(
             @PathVariable String userId,
-            @RequestBody CreateUserProfileRequest request) {
+            @RequestBody CreateUserProfileRequest request,
+            HttpServletRequest httpRequest) {
         try {
+            // Authorization check: customers can only update their own data, admins can update all
+            if (!isAuthorized(httpRequest, userId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Access denied: You can only update your own profile");
+            }
+            
             Customer customer = customerService.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Customer profile not found for userId: " + userId));
             
@@ -370,8 +420,14 @@ public class UserProfileController {
      * Get all profiles (for admin modules)
      */
     @GetMapping
-    public ResponseEntity<?> getAllProfiles() {
+    public ResponseEntity<?> getAllProfiles(HttpServletRequest request) {
         try {
+            // Admin-only endpoint
+            if (!isAdmin(request)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Access denied: Admin privileges required");
+            }
+            
             List<Customer> customers = customerService.findAllCustomers();
             List<UserProfileResponse> responses = customers.stream()
                 .map(this::createUserProfileResponse)
@@ -386,8 +442,14 @@ public class UserProfileController {
      * Search profiles by name (for admin modules)
      */
     @GetMapping("/search")
-    public ResponseEntity<?> searchProfiles(@RequestParam String name) {
+    public ResponseEntity<?> searchProfiles(@RequestParam String name, HttpServletRequest request) {
         try {
+            // Admin-only endpoint
+            if (!isAdmin(request)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Access denied: Admin privileges required");
+            }
+            
             List<Customer> customers = customerService.searchByName(name);
             List<UserProfileResponse> responses = customers.stream()
                 .map(this::createUserProfileResponse)
@@ -402,8 +464,14 @@ public class UserProfileController {
      * Delete profile by userId (for admin modules)
      */
     @DeleteMapping("/user/{userId}")
-    public ResponseEntity<?> deleteProfile(@PathVariable String userId) {
+    public ResponseEntity<?> deleteProfile(@PathVariable String userId, HttpServletRequest request) {
         try {
+            // Admin-only endpoint
+            if (!isAdmin(request)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Access denied: Admin privileges required");
+            }
+            
             Customer customer = customerService.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Customer profile not found for userId: " + userId));
             
@@ -451,8 +519,15 @@ public class UserProfileController {
     )
     public ResponseEntity<?> updateAddress(
             @PathVariable String userId,
-            @RequestBody UpdateAddressRequest request) {
+            @RequestBody UpdateAddressRequest request,
+            HttpServletRequest httpRequest) {
         try {
+            // Authorization check: customers can only update their own data, admins can update all
+            if (!isAuthorized(httpRequest, userId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Access denied: You can only update your own profile");
+            }
+            
             Customer customer = customerService.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Customer profile not found for userId: " + userId));
             
@@ -487,8 +562,15 @@ public class UserProfileController {
     )
     public ResponseEntity<?> updateName(
             @PathVariable String userId,
-            @RequestBody UpdateNameRequest request) {
+            @RequestBody UpdateNameRequest request,
+            HttpServletRequest httpRequest) {
         try {
+            // Authorization check: customers can only update their own data, admins can update all
+            if (!isAuthorized(httpRequest, userId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Access denied: You can only update your own profile");
+            }
+            
             Customer customer = customerService.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Customer profile not found for userId: " + userId));
             
@@ -540,8 +622,15 @@ public class UserProfileController {
     )
     public ResponseEntity<?> updateIdentification(
             @PathVariable String userId,
-            @RequestBody UpdateIdentificationRequest request) {
+            @RequestBody UpdateIdentificationRequest request,
+            HttpServletRequest httpRequest) {
         try {
+            // Authorization check: customers can only update their own data, admins can update all
+            if (!isAuthorized(httpRequest, userId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Access denied: You can only update your own profile");
+            }
+            
             Customer customer = customerService.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Customer profile not found for userId: " + userId));
             
