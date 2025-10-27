@@ -153,6 +153,7 @@ public class UserProfileController {
                     firstName.setNameComponentType(CustomerNameComponent.NameComponentType.FIRST_NAME);
                     firstName.setNameValue(request.getFirstName());
                     firstName.setEffectiveDate(LocalDateTime.now());
+                    firstName.setCustomerNumber(savedCustomer.getCustomerNumber());
                     nameComponentService.save(firstName);
                 }
                 
@@ -162,6 +163,7 @@ public class UserProfileController {
                     lastName.setNameComponentType(CustomerNameComponent.NameComponentType.LAST_NAME);
                     lastName.setNameValue(request.getLastName());
                     lastName.setEffectiveDate(LocalDateTime.now());
+                    lastName.setCustomerNumber(savedCustomer.getCustomerNumber());
                     nameComponentService.save(lastName);
                 }
                 
@@ -171,6 +173,7 @@ public class UserProfileController {
                     middleName.setNameComponentType(CustomerNameComponent.NameComponentType.MIDDLE_NAME);
                     middleName.setNameValue(request.getMiddleName());
                     middleName.setEffectiveDate(LocalDateTime.now());
+                    middleName.setCustomerNumber(savedCustomer.getCustomerNumber());
                     nameComponentService.save(middleName);
                 }
             }
@@ -182,6 +185,7 @@ public class UserProfileController {
                 aadhar.setIdentificationType(CustomerIdentification.AADHAR_CARD);
                 aadhar.setIdentificationItem(request.getAadharNumber());
                 aadhar.setEffectiveDate(LocalDateTime.now());
+                aadhar.setCustomerNumber(savedCustomer.getCustomerNumber());
                 identificationService.save(aadhar);
             }
             
@@ -191,6 +195,7 @@ public class UserProfileController {
                 pan.setIdentificationType(CustomerIdentification.PAN_CARD);
                 pan.setIdentificationItem(request.getPanNumber());
                 pan.setEffectiveDate(LocalDateTime.now());
+                pan.setCustomerNumber(savedCustomer.getCustomerNumber());
                 identificationService.save(pan);
             }
             
@@ -201,6 +206,7 @@ public class UserProfileController {
                 passport.setIdentificationType(CustomerIdentification.PASSPORT);
                 passport.setIdentificationItem(request.getPassportNumber());
                 passport.setEffectiveDate(LocalDateTime.now());
+                passport.setCustomerNumber(savedCustomer.getCustomerNumber());
                 identificationService.save(passport);
             }
             
@@ -210,6 +216,7 @@ public class UserProfileController {
                 license.setIdentificationType(CustomerIdentification.DRIVING_LICENSE);
                 license.setIdentificationItem(request.getDrivingLicense());
                 license.setEffectiveDate(LocalDateTime.now());
+                license.setCustomerNumber(savedCustomer.getCustomerNumber());
                 identificationService.save(license);
             }
             
@@ -220,6 +227,7 @@ public class UserProfileController {
                 addressLine1Component.setAddressComponentType(CustomerAddressComponent.AddressComponentType.ADDRESS_LINE_1);
                 addressLine1Component.setAddressValue(primaryAddress);
                 addressLine1Component.setEffectiveDate(LocalDateTime.now());
+                addressLine1Component.setCustomerNumber(savedCustomer.getCustomerNumber());
                 addressComponentService.save(addressLine1Component);
             }
             
@@ -229,6 +237,7 @@ public class UserProfileController {
                 addressLine2Component.setAddressComponentType(CustomerAddressComponent.AddressComponentType.ADDRESS_LINE_2);
                 addressLine2Component.setAddressValue(request.getAddressLine2());
                 addressLine2Component.setEffectiveDate(LocalDateTime.now());
+                addressLine2Component.setCustomerNumber(savedCustomer.getCustomerNumber());
                 addressComponentService.save(addressLine2Component);
             }
             
@@ -238,6 +247,7 @@ public class UserProfileController {
                 cityComponent.setAddressComponentType(CustomerAddressComponent.AddressComponentType.CITY);
                 cityComponent.setAddressValue(request.getCity());
                 cityComponent.setEffectiveDate(LocalDateTime.now());
+                cityComponent.setCustomerNumber(savedCustomer.getCustomerNumber());
                 addressComponentService.save(cityComponent);
             }
             
@@ -247,6 +257,7 @@ public class UserProfileController {
                 stateComponent.setAddressComponentType(CustomerAddressComponent.AddressComponentType.STATE);
                 stateComponent.setAddressValue(request.getState());
                 stateComponent.setEffectiveDate(LocalDateTime.now());
+                stateComponent.setCustomerNumber(savedCustomer.getCustomerNumber());
                 addressComponentService.save(stateComponent);
             }
             
@@ -256,6 +267,7 @@ public class UserProfileController {
                 countryComponent.setAddressComponentType(CustomerAddressComponent.AddressComponentType.COUNTRY);
                 countryComponent.setAddressValue(request.getCountry());
                 countryComponent.setEffectiveDate(LocalDateTime.now());
+                countryComponent.setCustomerNumber(savedCustomer.getCustomerNumber());
                 addressComponentService.save(countryComponent);
             }
             
@@ -265,6 +277,7 @@ public class UserProfileController {
                 postalCodeComponent.setAddressComponentType(CustomerAddressComponent.AddressComponentType.POSTAL_CODE);
                 postalCodeComponent.setAddressValue(request.getPostalCode());
                 postalCodeComponent.setEffectiveDate(LocalDateTime.now());
+                postalCodeComponent.setCustomerNumber(savedCustomer.getCustomerNumber());
                 addressComponentService.save(postalCodeComponent);
             }
             
@@ -315,22 +328,93 @@ public class UserProfileController {
     }
     
     /**
-     * Update profile by userId (for other modules)
+     * Update profile by customer number
      */
-    @PutMapping("/user/{userId}")
-    public ResponseEntity<?> updateProfileByUserId(
-            @PathVariable String userId,
+    @PutMapping("/customer/{customerNumber}")
+    @Operation(
+        summary = "Update customer profile by customer number",
+        description = "Updates customer profile information. Customers can only update their own profile, admins can update any profile."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "Customer profile updated successfully",
+            content = @Content(
+                mediaType = "application/json", 
+                schema = @Schema(implementation = UserProfileResponse.class),
+                examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                    value = "{\n" +
+                            "  \"customerId\": \"550e8400-e29b-41d4-a716-446655440000\",\n" +
+                            "  \"customerNumber\": \"CUST-20251024-000001\",\n" +
+                            "  \"crudOperation\": \"U\",\n" +
+                            "  \"versionTimestamp\": \"2025-01-24T10:30:00\",\n" +
+                            "  \"userId\": \"user123\",\n" +
+                            "  \"email\": \"updated.email@example.com\",\n" +
+                            "  \"firstName\": \"John\",\n" +
+                            "  \"lastName\": \"Doe\",\n" +
+                            "  \"phoneNumber\": \"+1234567890\",\n" +
+                            "  \"dateOfBirth\": \"1990-01-15\",\n" +
+                            "  \"gender\": \"Male\",\n" +
+                            "  \"nationality\": \"Indian\",\n" +
+                            "  \"addressLine1\": \"123 Main Street\",\n" +
+                            "  \"city\": \"Mumbai\",\n" +
+                            "  \"state\": \"Maharashtra\",\n" +
+                            "  \"country\": \"India\",\n" +
+                            "  \"postalCode\": \"400001\",\n" +
+                            "  \"customerStatus\": \"ACTIVE\",\n" +
+                            "  \"kycStatus\": \"COMPLETED\"\n" +
+                            "}"
+                )
+            )
+        ),
+        @ApiResponse(responseCode = "400", description = "Invalid request data"),
+        @ApiResponse(responseCode = "403", description = "Access denied - insufficient permissions"),
+        @ApiResponse(responseCode = "404", description = "Customer profile not found")
+    })
+    public ResponseEntity<?> updateProfileByCustomerNumber(
+            @Parameter(description = "Customer number (e.g., CUST-20251024-000001)", required = true, example = "CUST-20251024-000001")
+            @PathVariable String customerNumber,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                description = "Updated profile information (Note: userId comes from JWT token, identification documents should be updated via /identification endpoint)",
+                required = true,
+                content = @Content(
+                    schema = @Schema(implementation = CreateUserProfileRequest.class),
+                    examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                        name = "Update Profile Example",
+                        summary = "Example request to update customer profile",
+                        description = "Only include fields you want to update. userId is read from JWT token, not from request body. Identification documents (aadhar, pan, etc.) should be updated via the /identification endpoint.",
+                        value = "{\n" +
+                                "  \"email\": \"updated.email@example.com\",\n" +
+                                "  \"firstName\": \"John\",\n" +
+                                "  \"lastName\": \"Doe\",\n" +
+                                "  \"middleName\": \"Michael\",\n" +
+                                "  \"dateOfBirth\": \"1990-01-15\",\n" +
+                                "  \"gender\": \"Male\",\n" +
+                                "  \"nationality\": \"Indian\",\n" +
+                                "  \"phoneNumber\": \"+919876543210\",\n" +
+                                "  \"alternatePhone\": \"+919876543211\",\n" +
+                                "  \"addressLine1\": \"123 Main Street\",\n" +
+                                "  \"addressLine2\": \"Apartment 4B\",\n" +
+                                "  \"city\": \"Mumbai\",\n" +
+                                "  \"state\": \"Maharashtra\",\n" +
+                                "  \"country\": \"India\",\n" +
+                                "  \"postalCode\": \"400001\"\n" +
+                                "}"
+                    )
+                )
+            )
             @RequestBody CreateUserProfileRequest request,
             HttpServletRequest httpRequest) {
         try {
-            // Authorization check: customers can only update their own data, admins can update all
-            if (!isAuthorized(httpRequest, userId)) {
+            // Find customer by customer number first
+            Customer customer = customerService.findByCustomerNumber(customerNumber)
+                .orElseThrow(() -> new RuntimeException("Customer profile not found for customerNumber: " + customerNumber));
+            
+            // Authorization check: customers can only update their own data, admins can access all
+            if (!isAuthorized(httpRequest, customer.getUserId())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body("Access denied: You can only update your own profile");
             }
-            
-            Customer customer = customerService.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Customer profile not found for userId: " + userId));
             
             // Update customer fields
             customer.setEmailId(request.getEmail());
@@ -361,8 +445,7 @@ public class UserProfileController {
             Customer savedCustomer = customerService.updateCustomer(customer);
             
             // Update name components
-            // For simplicity, delete and recreate name components
-            nameComponentService.deleteByCustomerCustomerId(customer.getCustomerId());
+            // Create new name component versions for the updated customer
             
             if (request.getFirstName() != null) {
                 CustomerNameComponent firstName = new CustomerNameComponent();
@@ -370,6 +453,9 @@ public class UserProfileController {
                 firstName.setNameComponentType(CustomerNameComponent.NameComponentType.FIRST_NAME);
                 firstName.setNameValue(request.getFirstName());
                 firstName.setEffectiveDate(LocalDateTime.now());
+                firstName.setCrudOperation(CustomerNameComponent.CrudOperation.U);
+                firstName.setVersionTimestamp(LocalDateTime.now());
+                firstName.setCustomerNumber(savedCustomer.getCustomerNumber());
                 nameComponentService.save(firstName);
             }
             
@@ -379,6 +465,9 @@ public class UserProfileController {
                 lastName.setNameComponentType(CustomerNameComponent.NameComponentType.LAST_NAME);
                 lastName.setNameValue(request.getLastName());
                 lastName.setEffectiveDate(LocalDateTime.now());
+                lastName.setCrudOperation(CustomerNameComponent.CrudOperation.U);
+                lastName.setVersionTimestamp(LocalDateTime.now());
+                lastName.setCustomerNumber(savedCustomer.getCustomerNumber());
                 nameComponentService.save(lastName);
             }
             
@@ -475,10 +564,10 @@ public class UserProfileController {
             Customer customer = customerService.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Customer profile not found for userId: " + userId));
             
-            // Delete related records first
-            nameComponentService.deleteByCustomerCustomerId(customer.getCustomerId());
-            identificationService.deleteByCustomerCustomerId(customer.getCustomerId());
-            addressComponentService.deleteByCustomerCustomerId(customer.getCustomerId());
+            // Delete related records first (using customerNumber for stable reference)
+            nameComponentService.deleteByCustomerNumber(customer.getCustomerNumber());
+            identificationService.deleteByCustomerNumber(customer.getCustomerNumber());
+            addressComponentService.deleteByCustomerNumber(customer.getCustomerNumber());
             
             // Delete customer (soft delete)
             customerService.deleteCustomer(customer.getCustomerId());
@@ -512,24 +601,76 @@ public class UserProfileController {
     /**
      * Update customer address (INSERT-ONLY: creates new version with U operation)
      */
-    @PutMapping("/user/{userId}/address")
+    @PutMapping("/customer/{customerNumber}/address")
     @Operation(
         summary = "Update customer address",
         description = "Updates customer address by creating a new version of the customer record (INSERT-ONLY paradigm). The original record is preserved for audit trail."
     )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "Address updated successfully",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = UserProfileResponse.class),
+                examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                    value = "{\n" +
+                            "  \"customerId\": \"550e8400-e29b-41d4-a716-446655440000\",\n" +
+                            "  \"customerNumber\": \"CUST-20251024-000001\",\n" +
+                            "  \"crudOperation\": \"U\",\n" +
+                            "  \"versionTimestamp\": \"2025-01-24T10:35:00\",\n" +
+                            "  \"userId\": \"user123\",\n" +
+                            "  \"email\": \"customer@example.com\",\n" +
+                            "  \"firstName\": \"John\",\n" +
+                            "  \"lastName\": \"Doe\",\n" +
+                            "  \"addressLine1\": \"456 New Address Street\",\n" +
+                            "  \"addressLine2\": \"Apt 789\",\n" +
+                            "  \"city\": \"Bangalore\",\n" +
+                            "  \"state\": \"Karnataka\",\n" +
+                            "  \"country\": \"India\",\n" +
+                            "  \"postalCode\": \"560001\",\n" +
+                            "  \"customerStatus\": \"ACTIVE\",\n" +
+                            "  \"kycStatus\": \"COMPLETED\"\n" +
+                            "}"
+                )
+            )
+        ),
+        @ApiResponse(responseCode = "400", description = "Invalid address data"),
+        @ApiResponse(responseCode = "403", description = "Access denied"),
+        @ApiResponse(responseCode = "404", description = "Customer not found")
+    })
     public ResponseEntity<?> updateAddress(
-            @PathVariable String userId,
+            @Parameter(description = "Customer number (e.g., CUST-20251024-000001)", required = true)
+            @PathVariable String customerNumber,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                description = "Updated address information",
+                required = true,
+                content = @Content(
+                    schema = @Schema(implementation = UpdateAddressRequest.class),
+                    examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                        value = "{\n" +
+                                "  \"addressLine1\": \"456 New Address Street\",\n" +
+                                "  \"addressLine2\": \"Apt 789\",\n" +
+                                "  \"city\": \"Bangalore\",\n" +
+                                "  \"state\": \"Karnataka\",\n" +
+                                "  \"country\": \"India\",\n" +
+                                "  \"postalCode\": \"560001\"\n" +
+                                "}"
+                    )
+                )
+            )
             @RequestBody UpdateAddressRequest request,
             HttpServletRequest httpRequest) {
         try {
+            // Find customer by customer number first
+            Customer customer = customerService.findByCustomerNumber(customerNumber)
+                .orElseThrow(() -> new RuntimeException("Customer profile not found for customerNumber: " + customerNumber));
+            
             // Authorization check: customers can only update their own data, admins can update all
-            if (!isAuthorized(httpRequest, userId)) {
+            if (!isAuthorized(httpRequest, customer.getUserId())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body("Access denied: You can only update your own profile");
             }
-            
-            Customer customer = customerService.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Customer profile not found for userId: " + userId));
             
             // Update address fields
             customer.setAddressLine1(request.getAddressLine1());
@@ -555,24 +696,69 @@ public class UserProfileController {
     /**
      * Update customer name (INSERT-ONLY: creates new version with U operation)
      */
-    @PutMapping("/user/{userId}/name")
+    @PutMapping("/customer/{customerNumber}/name")
     @Operation(
         summary = "Update customer name",
         description = "Updates customer name by creating a new version of the customer record (INSERT-ONLY paradigm). The original record is preserved for audit trail."
     )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200",
+            description = "Name updated successfully",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = UserProfileResponse.class),
+                examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                    value = "{\n" +
+                            "  \"customerId\": \"550e8400-e29b-41d4-a716-446655440000\",\n" +
+                            "  \"customerNumber\": \"CUST-20251024-000001\",\n" +
+                            "  \"crudOperation\": \"U\",\n" +
+                            "  \"versionTimestamp\": \"2025-01-24T10:40:00\",\n" +
+                            "  \"userId\": \"user123\",\n" +
+                            "  \"email\": \"customer@example.com\",\n" +
+                            "  \"firstName\": \"Jane\",\n" +
+                            "  \"middleName\": \"Marie\",\n" +
+                            "  \"lastName\": \"Smith\",\n" +
+                            "  \"phoneNumber\": \"+1234567890\",\n" +
+                            "  \"customerStatus\": \"ACTIVE\",\n" +
+                            "  \"kycStatus\": \"COMPLETED\"\n" +
+                            "}"
+                )
+            )
+        ),
+        @ApiResponse(responseCode = "400", description = "Invalid name data"),
+        @ApiResponse(responseCode = "403", description = "Access denied"),
+        @ApiResponse(responseCode = "404", description = "Customer not found")
+    })
     public ResponseEntity<?> updateName(
-            @PathVariable String userId,
+            @Parameter(description = "Customer number (e.g., CUST-20251024-000001)", required = true)
+            @PathVariable String customerNumber,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                description = "Updated name information",
+                required = true,
+                content = @Content(
+                    schema = @Schema(implementation = UpdateNameRequest.class),
+                    examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                        value = "{\n" +
+                                "  \"firstName\": \"Jane\",\n" +
+                                "  \"middleName\": \"Marie\",\n" +
+                                "  \"lastName\": \"Smith\"\n" +
+                                "}"
+                    )
+                )
+            )
             @RequestBody UpdateNameRequest request,
             HttpServletRequest httpRequest) {
         try {
+            // Find customer by customer number first
+            Customer customer = customerService.findByCustomerNumber(customerNumber)
+                .orElseThrow(() -> new RuntimeException("Customer profile not found for customerNumber: " + customerNumber));
+            
             // Authorization check: customers can only update their own data, admins can update all
-            if (!isAuthorized(httpRequest, userId)) {
+            if (!isAuthorized(httpRequest, customer.getUserId())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body("Access denied: You can only update your own profile");
             }
-            
-            Customer customer = customerService.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Customer profile not found for userId: " + userId));
             
             // This will create a new row with CrudOperation = U
             Customer updatedCustomer = customerService.updateCustomer(customer);
@@ -584,6 +770,9 @@ public class UserProfileController {
                 firstName.setNameComponentType(CustomerNameComponent.NameComponentType.FIRST_NAME);
                 firstName.setNameValue(request.getFirstName());
                 firstName.setEffectiveDate(LocalDateTime.now());
+                firstName.setCrudOperation(CustomerNameComponent.CrudOperation.U);
+                firstName.setVersionTimestamp(LocalDateTime.now());
+                firstName.setCustomerNumber(updatedCustomer.getCustomerNumber());
                 nameComponentService.save(firstName);
             }
             
@@ -593,6 +782,9 @@ public class UserProfileController {
                 middleName.setNameComponentType(CustomerNameComponent.NameComponentType.MIDDLE_NAME);
                 middleName.setNameValue(request.getMiddleName());
                 middleName.setEffectiveDate(LocalDateTime.now());
+                middleName.setCrudOperation(CustomerNameComponent.CrudOperation.U);
+                middleName.setVersionTimestamp(LocalDateTime.now());
+                middleName.setCustomerNumber(updatedCustomer.getCustomerNumber());
                 nameComponentService.save(middleName);
             }
             
@@ -602,6 +794,9 @@ public class UserProfileController {
                 lastName.setNameComponentType(CustomerNameComponent.NameComponentType.LAST_NAME);
                 lastName.setNameValue(request.getLastName());
                 lastName.setEffectiveDate(LocalDateTime.now());
+                lastName.setCrudOperation(CustomerNameComponent.CrudOperation.U);
+                lastName.setVersionTimestamp(LocalDateTime.now());
+                lastName.setCustomerNumber(updatedCustomer.getCustomerNumber());
                 nameComponentService.save(lastName);
             }
             
@@ -615,24 +810,74 @@ public class UserProfileController {
     /**
      * Update customer identification documents (INSERT-ONLY: creates new version with U operation)
      */
-    @PutMapping("/user/{userId}/identification")
+    @PutMapping("/customer/{customerNumber}/identification")
     @Operation(
         summary = "Update customer identification documents",
         description = "Updates customer identification documents by creating a new version of the customer record (INSERT-ONLY paradigm). The original record is preserved for audit trail."
     )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200",
+            description = "Identification documents updated successfully",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = UserProfileResponse.class),
+                examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                    value = "{\n" +
+                            "  \"customerId\": \"550e8400-e29b-41d4-a716-446655440000\",\n" +
+                            "  \"customerNumber\": \"CUST-20251024-000001\",\n" +
+                            "  \"crudOperation\": \"U\",\n" +
+                            "  \"versionTimestamp\": \"2025-01-24T10:45:00\",\n" +
+                            "  \"userId\": \"user123\",\n" +
+                            "  \"email\": \"customer@example.com\",\n" +
+                            "  \"firstName\": \"John\",\n" +
+                            "  \"lastName\": \"Doe\",\n" +
+                            "  \"aadharNumber\": \"1234-5678-9012\",\n" +
+                            "  \"maskedAadhar\": \"XXXX-XXXX-9012\",\n" +
+                            "  \"panNumber\": \"ABCDE1234F\",\n" +
+                            "  \"maskedPan\": \"ABXXXX34F\",\n" +
+                            "  \"passportNumber\": \"K1234567\",\n" +
+                            "  \"drivingLicense\": \"DL-1234567890\",\n" +
+                            "  \"customerStatus\": \"ACTIVE\",\n" +
+                            "  \"kycStatus\": \"COMPLETED\"\n" +
+                            "}"
+                )
+            )
+        ),
+        @ApiResponse(responseCode = "400", description = "Invalid identification data"),
+        @ApiResponse(responseCode = "403", description = "Access denied"),
+        @ApiResponse(responseCode = "404", description = "Customer not found")
+    })
     public ResponseEntity<?> updateIdentification(
-            @PathVariable String userId,
+            @Parameter(description = "Customer number (e.g., CUST-20251024-000001)", required = true)
+            @PathVariable String customerNumber,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                description = "Updated identification documents",
+                required = true,
+                content = @Content(
+                    schema = @Schema(implementation = UpdateIdentificationRequest.class),
+                    examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                        value = "{\n" +
+                                "  \"aadharNumber\": \"1234-5678-9012\",\n" +
+                                "  \"panNumber\": \"ABCDE1234F\",\n" +
+                                "  \"passportNumber\": \"K1234567\",\n" +
+                                "  \"drivingLicense\": \"DL-1234567890\"\n" +
+                                "}"
+                    )
+                )
+            )
             @RequestBody UpdateIdentificationRequest request,
             HttpServletRequest httpRequest) {
         try {
+            // Find customer by customer number first
+            Customer customer = customerService.findByCustomerNumber(customerNumber)
+                .orElseThrow(() -> new RuntimeException("Customer profile not found for customerNumber: " + customerNumber));
+            
             // Authorization check: customers can only update their own data, admins can update all
-            if (!isAuthorized(httpRequest, userId)) {
+            if (!isAuthorized(httpRequest, customer.getUserId())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body("Access denied: You can only update your own profile");
             }
-            
-            Customer customer = customerService.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Customer profile not found for userId: " + userId));
             
             // This will create a new row with CrudOperation = U
             Customer updatedCustomer = customerService.updateCustomer(customer);
@@ -644,6 +889,8 @@ public class UserProfileController {
                 aadhar.setIdentificationType(CustomerIdentification.AADHAR_CARD);
                 aadhar.setIdentificationItem(request.getAadharNumber());
                 aadhar.setEffectiveDate(LocalDateTime.now());
+                aadhar.setCrudOperation(CustomerIdentification.CrudOperation.U);
+                aadhar.setVersionTimestamp(LocalDateTime.now());
                 identificationService.save(aadhar);
             }
             
@@ -653,6 +900,8 @@ public class UserProfileController {
                 pan.setIdentificationType(CustomerIdentification.PAN_CARD);
                 pan.setIdentificationItem(request.getPanNumber());
                 pan.setEffectiveDate(LocalDateTime.now());
+                pan.setCrudOperation(CustomerIdentification.CrudOperation.U);
+                pan.setVersionTimestamp(LocalDateTime.now());
                 identificationService.save(pan);
             }
             
@@ -662,6 +911,8 @@ public class UserProfileController {
                 passport.setIdentificationType(CustomerIdentification.PASSPORT);
                 passport.setIdentificationItem(request.getPassportNumber());
                 passport.setEffectiveDate(LocalDateTime.now());
+                passport.setCrudOperation(CustomerIdentification.CrudOperation.U);
+                passport.setVersionTimestamp(LocalDateTime.now());
                 identificationService.save(passport);
             }
             
@@ -671,6 +922,8 @@ public class UserProfileController {
                 license.setIdentificationType(CustomerIdentification.DRIVING_LICENSE);
                 license.setIdentificationItem(request.getDrivingLicense());
                 license.setEffectiveDate(LocalDateTime.now());
+                license.setCrudOperation(CustomerIdentification.CrudOperation.U);
+                license.setVersionTimestamp(LocalDateTime.now());
                 identificationService.save(license);
             }
             
@@ -732,6 +985,9 @@ public class UserProfileController {
             component.setAddressComponentType(CustomerAddressComponent.AddressComponentType.ADDRESS_LINE_1);
             component.setAddressValue(request.getAddressLine1());
             component.setEffectiveDate(LocalDateTime.now());
+            component.setCrudOperation(CustomerAddressComponent.CrudOperation.U);
+            component.setVersionTimestamp(LocalDateTime.now());
+            component.setCustomerNumber(customer.getCustomerNumber());
             addressComponentService.save(component);
         }
         
@@ -741,6 +997,9 @@ public class UserProfileController {
             component.setAddressComponentType(CustomerAddressComponent.AddressComponentType.ADDRESS_LINE_2);
             component.setAddressValue(request.getAddressLine2());
             component.setEffectiveDate(LocalDateTime.now());
+            component.setCrudOperation(CustomerAddressComponent.CrudOperation.U);
+            component.setVersionTimestamp(LocalDateTime.now());
+            component.setCustomerNumber(customer.getCustomerNumber());
             addressComponentService.save(component);
         }
         
@@ -750,6 +1009,9 @@ public class UserProfileController {
             component.setAddressComponentType(CustomerAddressComponent.AddressComponentType.CITY);
             component.setAddressValue(request.getCity());
             component.setEffectiveDate(LocalDateTime.now());
+            component.setCrudOperation(CustomerAddressComponent.CrudOperation.U);
+            component.setVersionTimestamp(LocalDateTime.now());
+            component.setCustomerNumber(customer.getCustomerNumber());
             addressComponentService.save(component);
         }
         
@@ -759,6 +1021,9 @@ public class UserProfileController {
             component.setAddressComponentType(CustomerAddressComponent.AddressComponentType.STATE);
             component.setAddressValue(request.getState());
             component.setEffectiveDate(LocalDateTime.now());
+            component.setCrudOperation(CustomerAddressComponent.CrudOperation.U);
+            component.setVersionTimestamp(LocalDateTime.now());
+            component.setCustomerNumber(customer.getCustomerNumber());
             addressComponentService.save(component);
         }
         
@@ -768,6 +1033,9 @@ public class UserProfileController {
             component.setAddressComponentType(CustomerAddressComponent.AddressComponentType.COUNTRY);
             component.setAddressValue(request.getCountry());
             component.setEffectiveDate(LocalDateTime.now());
+            component.setCrudOperation(CustomerAddressComponent.CrudOperation.U);
+            component.setVersionTimestamp(LocalDateTime.now());
+            component.setCustomerNumber(customer.getCustomerNumber());
             addressComponentService.save(component);
         }
         
@@ -777,6 +1045,9 @@ public class UserProfileController {
             component.setAddressComponentType(CustomerAddressComponent.AddressComponentType.POSTAL_CODE);
             component.setAddressValue(request.getPostalCode());
             component.setEffectiveDate(LocalDateTime.now());
+            component.setCrudOperation(CustomerAddressComponent.CrudOperation.U);
+            component.setVersionTimestamp(LocalDateTime.now());
+            component.setCustomerNumber(customer.getCustomerNumber());
             addressComponentService.save(component);
         }
     }
@@ -814,8 +1085,8 @@ public class UserProfileController {
         response.setKycStatus(customer.getKycStatus() != null ? customer.getKycStatus().name() : null);
         response.setKycCompletionDate(customer.getKycCompletionDate());
         
-        // Get name from normalized table using customer ID
-        List<CustomerNameComponent> nameComponents = nameComponentService.findByCustomerCustomerId(customer.getCustomerId());
+    // Get name from normalized table using customerNumber (business id)
+    List<CustomerNameComponent> nameComponents = nameComponentService.findByCustomerNumber(customer.getCustomerNumber());
         for (CustomerNameComponent nameComponent : nameComponents) {
             if (CustomerNameComponent.NameComponentType.FIRST_NAME.equals(nameComponent.getNameComponentType())) {
                 response.setFirstName(nameComponent.getNameValue());
@@ -826,8 +1097,8 @@ public class UserProfileController {
             }
         }
         
-        // Get address from normalized table using customer ID
-        List<CustomerAddressComponent> addressComponents = addressComponentService.findByCustomerCustomerId(customer.getCustomerId());
+    // Get address from normalized table using customerNumber (business id)
+    List<CustomerAddressComponent> addressComponents = addressComponentService.findByCustomerNumber(customer.getCustomerNumber());
         for (CustomerAddressComponent addressComponent : addressComponents) {
             if (CustomerAddressComponent.AddressComponentType.ADDRESS_LINE_1.equals(addressComponent.getAddressComponentType())) {
                 response.setAddressLine1(addressComponent.getAddressValue());
@@ -844,8 +1115,8 @@ public class UserProfileController {
             }
         }
         
-        // Get identification numbers from normalized table using customer ID
-        List<CustomerIdentification> identifications = identificationService.findByCustomerCustomerId(customer.getCustomerId());
+    // Get identification numbers from normalized table using customerNumber (business id)
+    List<CustomerIdentification> identifications = identificationService.findByCustomerNumber(customer.getCustomerNumber());
         for (CustomerIdentification id : identifications) {
             if (CustomerIdentification.AADHAR_CARD.equals(id.getIdentificationType())) {
                 String aadharNumber = id.getIdentificationItem();

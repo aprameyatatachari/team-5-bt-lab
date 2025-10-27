@@ -14,15 +14,20 @@ public interface CustomerNameComponentRepository extends JpaRepository<CustomerN
     
     List<CustomerNameComponent> findByCustomerCustomerId(String customerId);
     
+    // Find components by customer number (business id) - latest versions / ordering handled by caller
+    List<CustomerNameComponent> findByCustomerNumber(String customerNumber);
+    
     List<CustomerNameComponent> findByNameComponentType(CustomerNameComponent.NameComponentType nameComponentType);
     
     Optional<CustomerNameComponent> findByCustomerCustomerIdAndNameComponentType(String customerId, CustomerNameComponent.NameComponentType nameComponentType);
     
-    @Query("SELECT c FROM CustomerNameComponent c WHERE c.customer.customerId = :customerId ORDER BY c.effectiveDate DESC")
-    List<CustomerNameComponent> findByCustomerIdOrderByEffectiveDateDesc(@Param("customerId") String customerId);
+    @Query("SELECT c FROM CustomerNameComponent c WHERE c.customerNumber = :customerNumber AND c.crudOperation != 'D' ORDER BY c.versionTimestamp DESC")
+    List<CustomerNameComponent> findByCustomerNumberOrderByVersionDesc(@Param("customerNumber") String customerNumber);
     
     @Query("SELECT c FROM CustomerNameComponent c WHERE c.nameValue LIKE %:nameValue%")
     List<CustomerNameComponent> findByNameValueContaining(@Param("nameValue") String nameValue);
     
     void deleteByCustomerCustomerId(String customerId);
+    
+    void deleteByCustomerNumber(String customerNumber);
 }

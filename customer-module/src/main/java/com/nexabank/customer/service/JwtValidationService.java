@@ -8,7 +8,6 @@ import org.springframework.web.client.RestTemplate;
 
 import java.security.KeyFactory;
 import java.security.PublicKey;
-import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
 
 /**
@@ -27,6 +26,7 @@ public class JwtValidationService {
 
     /**
      * Fetch public key from Auth Service (lazy loading)
+     * Parses JWKS (JSON Web Key Set) format response
      */
     private void fetchPublicKeyFromAuthService() throws Exception {
         String publicKeyUrl = authServiceUrl + "/api/auth/public-key";
@@ -35,15 +35,41 @@ public class JwtValidationService {
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restTemplate.getForObject(publicKeyUrl, Map.class);
             
-            if (response != null && response.containsKey("publicKey")) {
-                String publicKeyBase64 = (String) response.get("publicKey");
-                byte[] publicKeyBytes = Base64.getDecoder().decode(publicKeyBase64);
-                X509EncodedKeySpec keySpec = new X509EncodedKeySpec(publicKeyBytes);
-                KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-                this.publicKey = keyFactory.generatePublic(keySpec);
-                System.out.println("✅ Public key fetched from Auth Service successfully");
+            if (response != null && response.containsKey("keys")) {
+                // Parse JWKS format: {"keys": [{"kty": "RSA", "n": "...", "e": "..."}]}
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> keys = (List<Map<String, Object>>) response.get("keys");
+                
+                if (keys != null && !keys.isEmpty()) {
+                    Map<String, Object> jwk = keys.get(0);
+                    
+                    // Extract modulus (n) and exponent (e) from JWK
+                    String modulusBase64 = (String) jwk.get("n");
+                    String exponentBase64 = (String) jwk.get("e");
+                    
+                    if (modulusBase64 != null && exponentBase64 != null) {
+                        // Decode Base64URL (used in JWK) to bytes
+                        byte[] modulusBytes = Base64.getUrlDecoder().decode(modulusBase64);
+                        byte[] exponentBytes = Base64.getUrlDecoder().decode(exponentBase64);
+                        
+                        // Create RSA public key from modulus and exponent
+                        java.math.BigInteger modulus = new java.math.BigInteger(1, modulusBytes);
+                        java.math.BigInteger exponent = new java.math.BigInteger(1, exponentBytes);
+                        
+                        java.security.spec.RSAPublicKeySpec keySpec = 
+                            new java.security.spec.RSAPublicKeySpec(modulus, exponent);
+                        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+                        this.publicKey = keyFactory.generatePublic(keySpec);
+                        
+                        System.out.println("✅ Public key fetched from Auth Service successfully (JWKS format)");
+                    } else {
+                        throw new Exception("JWK missing 'n' or 'e' fields");
+                    }
+                } else {
+                    throw new Exception("JWKS 'keys' array is empty");
+                }
             } else {
-                throw new Exception("Public key not found in response");
+                throw new Exception("Public key not found in response (expected JWKS format with 'keys' field)");
             }
         } catch (Exception e) {
             throw new Exception("Failed to fetch public key from " + publicKeyUrl + ": " + e.getMessage(), e);

@@ -133,11 +133,11 @@ public class CustomerService {
     }
     
     /**
-     * Find customer by email
+     * Find customer by email - returns latest non-deleted version
      */
     @Transactional(readOnly = true)
     public Optional<Customer> findByEmail(String emailId) {
-        return customerRepository.findByEmailId(emailId);
+        return customerRepository.findLatestByEmail(emailId);
     }
     
     /**

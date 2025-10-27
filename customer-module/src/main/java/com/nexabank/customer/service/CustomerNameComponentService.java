@@ -31,6 +31,14 @@ public class CustomerNameComponentService {
     public List<CustomerNameComponent> findByCustomerCustomerId(String customerId) {
         return nameComponentRepository.findByCustomerCustomerId(customerId);
     }
+
+    /**
+     * Find name components by customer number (business id)
+     */
+    @Transactional(readOnly = true)
+    public List<CustomerNameComponent> findByCustomerNumber(String customerNumber) {
+        return nameComponentRepository.findByCustomerNumberOrderByVersionDesc(customerNumber);
+    }
     
     /**
      * Find name components by name component type
@@ -53,6 +61,10 @@ public class CustomerNameComponentService {
      */
     public void deleteByCustomerCustomerId(String customerId) {
         nameComponentRepository.deleteByCustomerCustomerId(customerId);
+    }
+
+    public void deleteByCustomerNumber(String customerNumber) {
+        nameComponentRepository.deleteByCustomerNumber(customerNumber);
     }
     
     /**

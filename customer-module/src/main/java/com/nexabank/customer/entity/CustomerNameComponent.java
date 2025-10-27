@@ -35,10 +35,22 @@ public class CustomerNameComponent {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
+    // INSERT-ONLY audit trail fields
+    @Enumerated(EnumType.STRING)
+    @Column(name = "crud_operation", nullable = false)
+    private CrudOperation crudOperation = CrudOperation.C;
+    
+    @Column(name = "version_timestamp", nullable = false)
+    private LocalDateTime versionTimestamp;
+    
     // Relationship with Customer
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
+
+    // Business identifier to link components across versions (INSERT-ONLY)
+    @Column(name = "customer_number", nullable = false)
+    private String customerNumber;
     
     @PrePersist
     protected void onCreate() {
@@ -48,11 +60,20 @@ public class CustomerNameComponent {
         if (effectiveDate == null) {
             effectiveDate = now;
         }
+        if (versionTimestamp == null) {
+            versionTimestamp = now;
+        }
+        if (crudOperation == null) {
+            crudOperation = CrudOperation.C;
+        }
     }
-    
+
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
+        if (versionTimestamp == null) {
+            versionTimestamp = LocalDateTime.now();
+        }
     }
     
     // Common name component types as constants
@@ -65,5 +86,12 @@ public class CustomerNameComponent {
     
     public enum NameComponentType {
         FIRST_NAME, MIDDLE_NAME, LAST_NAME, MAIDEN_NAME, SUFFIX, PREFIX
+    }
+    
+    // CRUD Operation enum for INSERT-ONLY paradigm
+    public enum CrudOperation {
+        C, // Create
+        U, // Update
+        D  // Delete
     }
 }

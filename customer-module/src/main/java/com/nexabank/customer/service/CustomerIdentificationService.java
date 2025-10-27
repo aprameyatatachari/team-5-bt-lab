@@ -31,6 +31,14 @@ public class CustomerIdentificationService {
     public List<CustomerIdentification> findByCustomerCustomerId(String customerId) {
         return identificationRepository.findByCustomerCustomerId(customerId);
     }
+
+    /**
+     * Find identification documents by customer number (business id)
+     */
+    @Transactional(readOnly = true)
+    public List<CustomerIdentification> findByCustomerNumber(String customerNumber) {
+        return identificationRepository.findByCustomerNumber(customerNumber);
+    }
     
     /**
      * Find identification documents by type
@@ -53,6 +61,10 @@ public class CustomerIdentificationService {
      */
     public void deleteByCustomerCustomerId(String customerId) {
         identificationRepository.deleteByCustomerCustomerId(customerId);
+    }
+
+    public void deleteByCustomerNumber(String customerNumber) {
+        identificationRepository.deleteByCustomerNumber(customerNumber);
     }
     
     /**

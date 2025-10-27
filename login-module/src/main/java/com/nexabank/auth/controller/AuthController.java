@@ -436,6 +436,124 @@ public class AuthController {
                 .body(com.nexabank.auth.dto.ApiResponse.error("Registration failed: " + e.getMessage()));
         }
     }
+    
+    @Operation(
+        summary = "Register new admin user (Admin access required)",
+        description = """
+            Register a new admin user. This endpoint requires admin authentication via JWT token.
+            
+            **Authorization Required:**
+            - Must be authenticated with valid JWT token
+            - Token must have ADMIN_FULL_ACCESS or ADMIN_USER_MANAGEMENT role
+            - Token userType must be "ADMIN"
+            
+            **Admin Creation Process:**
+            1. Validates requesting admin's JWT token
+            2. Checks for ADMIN_USER_MANAGEMENT or ADMIN_FULL_ACCESS role
+            3. Creates new admin user with specified roles
+            4. Returns JWT tokens for the new admin
+            
+            **Security:**
+            - Only existing admins can create new admins
+            - Prevents privilege escalation
+            - All admin actions are auditable
+            
+            **Example Request:**
+            ```
+            POST /api/auth/register/admin
+            Authorization: Bearer <admin-jwt-token>
+            Content-Type: application/json
+            
+            {
+              "email": "newadmin@nexabank.com",
+              "password": "SecurePass123!",
+              "firstName": "John",
+              "lastName": "Admin",
+              "phoneNumber": "9876543210",
+              "dateOfBirth": "1990-01-01"
+            }
+            ```
+            """
+    )
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "201",
+            description = "Admin registered successfully",
+            content = @Content(mediaType = "application/json")
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "401",
+            description = "Unauthorized - Invalid or missing admin token"
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "403",
+            description = "Forbidden - Requires admin privileges"
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "409",
+            description = "Conflict - Admin with email already exists"
+        )
+    })
+    @PostMapping("/register/admin")
+    public ResponseEntity<?> registerAdmin(
+            @Valid @RequestBody RegisterRequest registerRequest,
+            HttpServletRequest request) {
+        try {
+            // Extract JWT token from Authorization header
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(com.nexabank.auth.dto.ApiResponse.error("Missing or invalid authorization header"));
+            }
+            
+            String token = authHeader.substring(7);
+            
+            // Validate token
+            if (!jwtTokenService.validateToken(token)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(com.nexabank.auth.dto.ApiResponse.error("Invalid or expired token"));
+            }
+            
+            // Check if user is admin with proper roles
+            String userType = jwtTokenService.extractUserType(token);
+            if (!"ADMIN".equals(userType)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(com.nexabank.auth.dto.ApiResponse.error("Only admins can register new admins"));
+            }
+            
+            // Check for admin roles
+            if (!jwtTokenService.hasAnyRole(token, User.Role.ADMIN_FULL_ACCESS, User.Role.ADMIN_USER_MANAGEMENT)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(com.nexabank.auth.dto.ApiResponse.error("Insufficient privileges. Requires ADMIN_USER_MANAGEMENT or ADMIN_FULL_ACCESS role"));
+            }
+            
+            // Set user type to ADMIN for the new user
+            registerRequest.setUserType("ADMIN");
+            
+            // Register the admin
+            User newAdmin = userService.registerUserWithProfile(registerRequest);
+            
+            // Create JWT tokens for the new admin
+            String accessToken = jwtTokenService.generateAccessTokenForUser(newAdmin);
+            String refreshToken = jwtTokenService.generateRefreshTokenForUser(newAdmin);
+            
+            AuthResponse authResponse = new AuthResponse();
+            authResponse.setAccessToken(accessToken);
+            authResponse.setRefreshToken(refreshToken);
+            authResponse.setTokenType("Bearer");
+            authResponse.setExpiresIn(86400L);
+            authResponse.setUser(newAdmin);
+            
+            return ResponseEntity.status(HttpStatus.CREATED)
+                .body(com.nexabank.auth.dto.ApiResponse.success("Admin registered successfully", authResponse));
+        } catch (UserAlreadyExistsException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(com.nexabank.auth.dto.ApiResponse.error("Admin with this email already exists"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(com.nexabank.auth.dto.ApiResponse.error("Admin registration failed: " + e.getMessage()));
+        }
+    }
 
     @Operation(
         summary = "Logout user and invalidate tokens",

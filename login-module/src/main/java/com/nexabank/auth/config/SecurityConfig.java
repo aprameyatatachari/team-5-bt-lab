@@ -49,7 +49,7 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authz -> authz
                 // Public endpoints - no authentication required
-                .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/public-key").permitAll()
                 .requestMatchers("/error", "/").permitAll()
                 .requestMatchers("/health", "/actuator/**").permitAll()
                 
@@ -57,6 +57,9 @@ public class SecurityConfig {
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/api-docs/**").permitAll()
                 .requestMatchers("/swagger-resources/**", "/webjars/**").permitAll()
+                
+                // Admin-only endpoints - requires admin authentication
+                .requestMatchers("/api/auth/register/admin").authenticated()
                 
                 // Protected endpoints - authentication required
                 .requestMatchers("/api/auth/me", "/api/auth/logout", "/api/auth/logout-all").authenticated()

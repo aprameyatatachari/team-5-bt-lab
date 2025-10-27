@@ -25,6 +25,11 @@ public interface CustomerIdentificationRepository extends JpaRepository<Customer
     List<CustomerIdentification> findByIdentificationItem(String identificationItem);
     
     List<CustomerIdentification> findByCustomerCustomerId(String customerId);
+
+    // Find identification documents by customer number (business id)
+    List<CustomerIdentification> findByCustomerNumber(String customerNumber);
     
     void deleteByCustomerCustomerId(String customerId);
+
+    void deleteByCustomerNumber(String customerNumber);
 }

@@ -23,6 +23,10 @@ public class CustomerAddressComponentService {
     public List<CustomerAddressComponent> findByCustomerCustomerId(String customerId) {
         return addressComponentRepository.findByCustomerCustomerId(customerId);
     }
+
+    public List<CustomerAddressComponent> findByCustomerNumber(String customerNumber) {
+        return addressComponentRepository.findByCustomerNumberOrderByVersionDesc(customerNumber);
+    }
     
     public Optional<CustomerAddressComponent> findByCustomerIdAndType(String customerId, CustomerAddressComponent.AddressComponentType type) {
         return addressComponentRepository.findByCustomerCustomerIdAndAddressComponentType(customerId, type);
@@ -38,6 +42,10 @@ public class CustomerAddressComponentService {
     
     public void deleteByCustomerCustomerId(String customerId) {
         addressComponentRepository.deleteByCustomerCustomerId(customerId);
+    }
+
+    public void deleteByCustomerNumber(String customerNumber) {
+        addressComponentRepository.deleteByCustomerNumber(customerNumber);
     }
     
     public void deleteById(String id) {
