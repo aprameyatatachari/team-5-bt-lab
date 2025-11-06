@@ -976,6 +976,124 @@ public class UserProfileController {
     }
     
     /**
+     * Public API to get email by customer number (for inter-service communication)
+     * This endpoint is intentionally public (no JWT required) to allow login-module to query it
+     */
+    @GetMapping("/public/customer/{customerNumber}/email")
+    @Operation(
+        summary = "Get customer email by customer number (Public API)",
+        description = "Returns the email address for a given customer number. This is a public endpoint used by other microservices (e.g., login-module) for authentication purposes."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Email found", 
+                    content = @Content(mediaType = "application/json")),
+        @ApiResponse(responseCode = "404", description = "Customer not found", 
+                    content = @Content(mediaType = "application/json"))
+    })
+    public ResponseEntity<?> getEmailByCustomerNumber(
+        @Parameter(description = "Customer number (e.g., CUST-20251024-000001)", required = true)
+        @PathVariable String customerNumber) {
+        try {
+            Customer customer = customerService.findByCustomerNumber(customerNumber)
+                .orElseThrow(() -> new RuntimeException("Customer not found with customerNumber: " + customerNumber));
+            
+            // Return simple JSON with email
+            return ResponseEntity.ok(new Object() {
+                public final String customerNumber = customer.getCustomerNumber();
+                public final String email = customer.getEmailId();
+            });
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new Object() {
+                    public final String error = e.getMessage();
+                });
+        }
+    }
+    
+    /**
+     * Public API to get phone number by customer number (for inter-service communication)
+     * This endpoint is intentionally public (no JWT required) to allow other modules to query it
+     */
+    @GetMapping("/public/customer/{customerNumber}/phone")
+    @Operation(
+        summary = "Get customer phone number by customer number (Public API)",
+        description = """
+            Returns the phone number for a given customer number. This is a public endpoint used by other microservices 
+            for communication purposes (e.g., notification service, SMS service).
+            
+            **Use Cases:**
+            - Notification service retrieving phone number for SMS/OTP
+            - Customer support systems fetching contact information
+            - Inter-service communication for contact verification
+            
+            **Response includes:**
+            - customerNumber: The unique customer identifier
+            - phoneNumber: Primary phone number (E.164 format recommended)
+            - alternatePhone: Secondary phone number (if available)
+            """
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "Phone number found", 
+            content = @Content(
+                mediaType = "application/json",
+                examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                    name = "Success Response",
+                    summary = "Successful phone number retrieval",
+                    value = """
+                        {
+                          "customerNumber": "CUST-20251024-000001",
+                          "phoneNumber": "+919876543210",
+                          "alternatePhone": "+919876543211"
+                        }
+                        """
+                )
+            )
+        ),
+        @ApiResponse(
+            responseCode = "404", 
+            description = "Customer not found", 
+            content = @Content(
+                mediaType = "application/json",
+                examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                    name = "Error Response",
+                    summary = "Customer not found",
+                    value = """
+                        {
+                          "error": "Customer not found with customerNumber: CUST-20251024-999999"
+                        }
+                        """
+                )
+            )
+        )
+    })
+    public ResponseEntity<?> getPhoneByCustomerNumber(
+        @Parameter(
+            description = "Customer number (e.g., CUST-20251024-000001)", 
+            required = true,
+            example = "CUST-20251024-000001"
+        )
+        @PathVariable String customerNumber) {
+        try {
+            Customer customer = customerService.findByCustomerNumber(customerNumber)
+                .orElseThrow(() -> new RuntimeException("Customer not found with customerNumber: " + customerNumber));
+            
+            // Return simple JSON with phone numbers
+            return ResponseEntity.ok(new Object() {
+                public final String customerNumber = customer.getCustomerNumber();
+                public final String phoneNumber = customer.getPhoneNumber();
+                public final String alternatePhone = customer.getAlternatePhone();
+            });
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new Object() {
+                    public final String error = e.getMessage();
+                });
+        }
+    }
+    
+    /**
      * Helper method to update address components
      */
     private void updateAddressComponents(Customer customer, UpdateAddressRequest request) {

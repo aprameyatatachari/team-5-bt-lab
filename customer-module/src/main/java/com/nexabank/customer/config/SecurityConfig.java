@@ -29,8 +29,9 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Public endpoint - registration can be called by auth service
+                // Public endpoints
                 .requestMatchers("/api/profiles").permitAll() // POST for registration from auth service
+                .requestMatchers("/api/profiles/public/**").permitAll() // Public API for inter-service calls
                 
                 // Swagger/OpenAPI endpoints
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll()
