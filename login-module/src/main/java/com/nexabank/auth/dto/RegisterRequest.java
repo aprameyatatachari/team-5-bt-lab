@@ -27,7 +27,7 @@ public class RegisterRequest {
     private String lastName;
     
     @NotBlank(message = "Phone number is required")
-    @Pattern(regexp = "^[6-9]\\d{9}$", message = "Phone number must be exactly 10 digits starting with 6, 7, 8, or 9")
+    @Pattern(regexp = "^\\+91[6-9]\\d{9}$", message = "Phone number must be in format +91 followed by 10 digits starting with 6, 7, 8, or 9")
     private String phoneNumber;
     
     @NotBlank(message = "Date of birth is required")

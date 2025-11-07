@@ -50,6 +50,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(authz -> authz
                 // Public endpoints - no authentication required
                 .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/public-key").permitAll()
+                .requestMatchers("/api/auth/v2/login").permitAll() // V2 login with customerNumber
                 .requestMatchers("/error", "/").permitAll()
                 .requestMatchers("/health", "/actuator/**").permitAll()
                 

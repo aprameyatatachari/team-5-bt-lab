@@ -28,7 +28,7 @@ import java.util.HashMap;
 @RestController
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
-@Tag(name = "Authentication", description = "Core authentication endpoints for login, registration, logout, and token refresh")
+@Tag(name = "Authentication", description = "Core authentication endpoints for login (email), registration, logout, and token refresh")
 public class AuthController {
 
     @Autowired
@@ -469,7 +469,7 @@ public class AuthController {
               "password": "SecurePass123!",
               "firstName": "John",
               "lastName": "Admin",
-              "phoneNumber": "9876543210",
+              "phoneNumber": "+919876543210",
               "dateOfBirth": "1990-01-01"
             }
             ```
