@@ -5,6 +5,7 @@ import com.nexabank.customer.dto.UpdateAddressRequest;
 import com.nexabank.customer.dto.UpdateNameRequest;
 import com.nexabank.customer.dto.UpdateIdentificationRequest;
 import com.nexabank.customer.dto.UserProfileResponse;
+import com.nexabank.customer.dto.CustomerAccountOpenedEvent;
 import com.nexabank.customer.entity.Customer;
 import com.nexabank.customer.entity.CustomerIdentification;
 import com.nexabank.customer.entity.CustomerNameComponent;
@@ -13,6 +14,7 @@ import com.nexabank.customer.service.CustomerService;
 import com.nexabank.customer.service.CustomerIdentificationService;
 import com.nexabank.customer.service.CustomerNameComponentService;
 import com.nexabank.customer.service.CustomerAddressComponentService;
+import com.nexabank.customer.service.CustomerEventPublisher;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -32,6 +34,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -56,6 +59,9 @@ public class UserProfileController {
     
     @Autowired
     private CustomerAddressComponentService addressComponentService;
+    
+    @Autowired
+    private CustomerEventPublisher eventPublisher;
     
     /**
      * Authorization helper method
@@ -279,6 +285,16 @@ public class UserProfileController {
                 postalCodeComponent.setEffectiveDate(LocalDateTime.now());
                 postalCodeComponent.setCustomerNumber(savedCustomer.getCustomerNumber());
                 addressComponentService.save(postalCodeComponent);
+            }
+            
+            // Publish Kafka event for customer account opened
+            try {
+                CustomerAccountOpenedEvent event = buildCustomerAccountOpenedEvent(savedCustomer, request);
+                eventPublisher.publishAccountOpenedEvent(event);
+            } catch (Exception kafkaException) {
+                // Log but don't fail the request if Kafka is unavailable
+                System.err.println("Failed to publish customer account opened event: " + kafkaException.getMessage());
+                kafkaException.printStackTrace();
             }
             
             // Create response using normalized data
@@ -1258,5 +1274,73 @@ public class UserProfileController {
         }
         
         return response;
+    }
+    
+    /**
+     * Helper method to build CustomerAccountOpenedEvent from Customer entity and request
+     * This event is published to Kafka for downstream processing (notifications, analytics, etc.)
+     */
+    private CustomerAccountOpenedEvent buildCustomerAccountOpenedEvent(
+            Customer customer, CreateUserProfileRequest request) {
+        
+        // Get name components
+        List<CustomerNameComponent> nameComponents = 
+            nameComponentService.findByCustomerNumber(customer.getCustomerNumber());
+        
+        String firstName = null;
+        String lastName = null;
+        String middleName = null;
+        
+        for (CustomerNameComponent nameComponent : nameComponents) {
+            if (CustomerNameComponent.NameComponentType.FIRST_NAME.equals(nameComponent.getNameComponentType())) {
+                firstName = nameComponent.getNameValue();
+            } else if (CustomerNameComponent.NameComponentType.LAST_NAME.equals(nameComponent.getNameComponentType())) {
+                lastName = nameComponent.getNameValue();
+            } else if (CustomerNameComponent.NameComponentType.MIDDLE_NAME.equals(nameComponent.getNameComponentType())) {
+                middleName = nameComponent.getNameValue();
+            }
+        }
+        
+        // Build full name
+        StringBuilder fullNameBuilder = new StringBuilder();
+        if (firstName != null) fullNameBuilder.append(firstName);
+        if (middleName != null) {
+            if (fullNameBuilder.length() > 0) fullNameBuilder.append(" ");
+            fullNameBuilder.append(middleName);
+        }
+        if (lastName != null) {
+            if (fullNameBuilder.length() > 0) fullNameBuilder.append(" ");
+            fullNameBuilder.append(lastName);
+        }
+        
+        // Build and return event
+        return CustomerAccountOpenedEvent.builder()
+                .eventId(java.util.UUID.randomUUID().toString())
+                .eventType("CUSTOMER_ACCOUNT_OPENED")
+                .eventTimestamp(LocalDateTime.now())
+                .customerNumber(customer.getCustomerNumber())
+                .userId(customer.getUserId())
+                .email(customer.getEmailId())
+                .phoneNumber(customer.getPhoneNumber())
+                .alternatePhone(customer.getAlternatePhone())
+                .firstName(firstName)
+                .lastName(lastName)
+                .middleName(middleName)
+                .fullName(fullNameBuilder.toString())
+                .dateOfBirth(customer.getDateOfBirth())
+                .gender(customer.getGender())
+                .nationality(customer.getNationality())
+                .addressLine1(customer.getAddressLine1())
+                .addressLine2(customer.getAddressLine2())
+                .city(customer.getCity())
+                .state(customer.getState())
+                .country(customer.getCountry())
+                .postalCode(customer.getPostalCode())
+                .occupation(request.getOccupation())
+                .employerName(request.getEmployerName())
+                .annualIncome(request.getAnnualIncome())
+                .source("API")
+                .remarks("Customer profile created via REST API")
+                .build();
     }
 }
