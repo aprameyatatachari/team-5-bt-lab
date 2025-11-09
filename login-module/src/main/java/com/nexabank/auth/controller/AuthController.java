@@ -695,13 +695,17 @@ public class AuthController {
             
             **Token Refresh Process:**
             1. Validates refresh token signature and expiration
-            2. Checks if user account is locked out
-            3. Extracts user email from refresh token
-            4. Generates new access token (24h validity)
-            5. Generates new refresh token (7d validity)
-            6. Adds old refresh token to denylist (prevents reuse)
-            7. Resets user session lockout (extends 10-minute lock)
-            8. Returns new token pair
+            2. Extracts user email from refresh token
+            3. Generates new access token (24h validity)
+            4. Generates new refresh token (7d validity)
+            5. Adds old refresh token to denylist (prevents reuse)
+            6. Returns new token pair
+            
+            **No Lockout Check:**
+            - Refresh endpoint does NOT check for account lockout
+            - Allows continuous token refresh during active sessions
+            - Enables frontend to refresh tokens every 9 minutes
+            - Session lockout only affects login, not token refresh
             
             **Token Rotation:**
             - Old refresh token immediately invalidated
@@ -712,14 +716,15 @@ public class AuthController {
             **Security Benefits:**
             - Refresh token rotation (one-time use)
             - Old tokens added to denylist
-            - Account lockout check before refresh
             - Stolen token detection
+            - Works independently of session lockout
             
             **When to Use:**
             - Access token expired or about to expire
             - Proactive token refresh (before expiration)
             - User still active but token old
             - Maintaining session continuity
+            - **Frontend**: Call every 9 minutes to keep session fresh
             
             **Best Practices:**
             - Refresh token before access token expires
@@ -738,9 +743,10 @@ public class AuthController {
             
             **Proactive Refresh:**
             - Frontend checks token expiration
-            - 5 minutes before expiry, calls refresh
+            - 9 minutes after login, calls refresh automatically
             - Gets new tokens without user interaction
             - Seamless user experience
+            - No interruption from session lockout
             
             **Expired Token:**
             - API returns 401 Unauthorized
@@ -807,23 +813,6 @@ public class AuthController {
             )
         ),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "423",
-            description = "Account locked - cannot refresh",
-            content = @Content(
-                mediaType = "application/json",
-                examples = @ExampleObject(
-                    name = "Account Locked",
-                    value = """
-                        {
-                          "success": false,
-                          "message": "Account locked. Please try again in 450 seconds",
-                          "timestamp": "2025-10-22T10:30:00Z"
-                        }
-                        """
-                )
-            )
-        ),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "500",
             description = "Server error during token refresh",
             content = @Content(
@@ -865,12 +854,8 @@ public class AuthController {
             if (jwtTokenService.validateToken(refreshRequest.getRefreshToken())) {
                 String email = jwtTokenService.extractEmail(refreshRequest.getRefreshToken());
                 
-                // Check if user is locked out
-                if (redisSessionService.isUserLockedOut(email)) {
-                    long remainingTime = redisSessionService.getRemainingLockoutTime(email);
-                    return ResponseEntity.status(HttpStatus.LOCKED)
-                        .body(com.nexabank.auth.dto.ApiResponse.error("Account locked. Please try again in " + remainingTime + " seconds"));
-                }
+                // No lockout check for refresh - allow token refresh during active sessions
+                // This enables frontend to refresh tokens every 9 minutes without interruption
                 
                 var userOptional = userService.findByEmail(email);
                 
@@ -879,12 +864,11 @@ public class AuthController {
                     String newAccessToken = jwtTokenService.generateAccessTokenForUser(user);
                     String newRefreshToken = jwtTokenService.generateRefreshTokenForUser(user);
                     
-                    // Add old refresh token to denylist and extend lockout
+                    // Add old refresh token to denylist (token rotation for security)
                     jwtTokenService.addTokenToDenylist(refreshRequest.getRefreshToken());
-                    redisSessionService.setUserLockout(user.getEmail()); // Reset 10-minute lockout
                     
-                    // Update session using the refresh session method
-                    // userService.refreshUserSession(refreshRequest.getRefreshToken());
+                    // Do NOT reset lockout - allow continuous token refresh without affecting session
+                    // Session lockout is only for login/logout flow, not for token refresh
                     
                     AuthResponse authResponse = new AuthResponse();
                     authResponse.setAccessToken(newAccessToken);
@@ -892,6 +876,8 @@ public class AuthController {
                     authResponse.setTokenType("Bearer");
                     authResponse.setExpiresIn(86400L); // 24 hours in seconds
                     authResponse.setUser(user);
+                    
+                    System.out.println("🔄 TOKEN REFRESH: User " + user.getEmail() + " refreshed tokens (9-minute interval)");
                     
                     return ResponseEntity.ok(com.nexabank.auth.dto.ApiResponse.success("Token refreshed successfully", authResponse));
                 }
